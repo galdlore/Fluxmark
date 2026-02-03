@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "FluxMarks",
+  "version": "1.0.0",
+  "icons": {
+    "16": "icons/Icon16.png",
+    "32": "icons/Icon32.png",
+    "48": "icons/Icon48.png",
+    "128": "icons/Icon128.png"
+  },
+  "action": {
+    "default_title": "Open Bookmarks",
+    "default_icon": {
+      "16": "icons/Icon16.png",
+      "32": "icons/Icon32.png",
+      "48": "icons/Icon48.png",
+      "128": "icons/Icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "src/background/index.ts",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "src/sidepanel/index.html"
+  },
+  "permissions": [
+    "bookmarks",
+    "sidePanel",
+    "tabs",
+    "storage",
+    "favicon"
+  ],
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+B",
+        "mac": "Alt+B"
+      },
+      "description": "Open Side Panel"
+    }
+  }
+}
