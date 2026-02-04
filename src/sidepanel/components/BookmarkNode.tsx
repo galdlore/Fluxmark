@@ -9,6 +9,9 @@ interface BookmarkNodeProps {
     node: VirtualNode;
     depth?: number;
     onContextMenu: (e: React.MouseEvent, node: VirtualNode) => void;
+    expandedNodes: Set<string>;
+    onToggle: (id: string) => void;
+    disabled?: boolean;
 }
 
 const FaviconImage: React.FC<{ url?: string }> = ({ url }) => {
@@ -16,18 +19,23 @@ const FaviconImage: React.FC<{ url?: string }> = ({ url }) => {
 
     if (error || !url) return <span className="opacity-70">📄</span>;
 
+    const faviconUrl = chrome.runtime.getURL(`_favicon/?pageUrl=${encodeURIComponent(url)}&size=16`);
+
     return (
         <img
-            src={chrome.runtime.getURL(`/_favicon/?pageUrl=${encodeURIComponent(url)}&size=32`)}
+            src={faviconUrl}
             alt=""
             className="w-4 h-4 object-contain"
-            onError={() => setError(true)}
+            onError={() => {
+                // console.warn('Favicon load failed:', faviconUrl);
+                setError(true);
+            }}
         />
     );
 };
 
-const BookmarkNode: React.FC<BookmarkNodeProps> = ({ node, depth = 0, onContextMenu }) => {
-    const [isOpen, setIsOpen] = useState(false);
+const BookmarkNode: React.FC<BookmarkNodeProps> = ({ node, depth = 0, onContextMenu, expandedNodes, onToggle, disabled }) => {
+    const isOpen = expandedNodes.has(node.id);
     const [flag, setFlag] = useState<OpenFlag>(null);
 
     const isFolder = !node.url;
@@ -41,7 +49,7 @@ const BookmarkNode: React.FC<BookmarkNodeProps> = ({ node, depth = 0, onContextM
         transform,
         transition,
         isDragging
-    } = useSortable({ id: node.id, data: { node } });
+    } = useSortable({ id: node.id, data: { node }, disabled });
 
     const style = {
         transform: CSS.Translate.toString(transform),
@@ -61,7 +69,7 @@ const BookmarkNode: React.FC<BookmarkNodeProps> = ({ node, depth = 0, onContextM
         e.stopPropagation();
 
         if (isFolder) {
-            setIsOpen(!isOpen);
+            onToggle(node.id);
         } else {
             // Map VirtualNode to BookmarkTreeNode-like object for openBookmark
             // We only need url and id really.
@@ -91,7 +99,12 @@ const BookmarkNode: React.FC<BookmarkNodeProps> = ({ node, depth = 0, onContextM
                 onClick={handleClick}
                 onContextMenu={handleContextMenu}
             >
-                <span className="mr-2 flex items-center justify-center w-4 h-4">
+                {flag && !isFolder && (
+                    <span className="mr-1 text-[10px] text-[var(--accent-color)] font-mono opacity-80">
+                        ({flag})
+                    </span>
+                )}
+                <span className="mr-2 flex items-center justify-center w-4 h-4 shrink-0">
                     {isFolder ? (
                         <span className="opacity-70">{isOpen ? '📂' : '📁'}</span>
                     ) : (
@@ -101,11 +114,6 @@ const BookmarkNode: React.FC<BookmarkNodeProps> = ({ node, depth = 0, onContextM
                 <span className="truncate text-sm flex-1">
                     {node.title}
                 </span>
-                {flag && !isFolder && (
-                    <span className="ml-2 text-[10px] bg-[var(--bg-active)] px-1 rounded text-[var(--accent-color)] font-bold">
-                        {flag}
-                    </span>
-                )}
             </div>
 
             {isFolder && isOpen && node.children && (
@@ -120,6 +128,9 @@ const BookmarkNode: React.FC<BookmarkNodeProps> = ({ node, depth = 0, onContextM
                                 node={child}
                                 depth={depth + 1}
                                 onContextMenu={onContextMenu}
+                                expandedNodes={expandedNodes}
+                                onToggle={onToggle}
+                                disabled={disabled}
                             />
                         ))}
                     </SortableContext>

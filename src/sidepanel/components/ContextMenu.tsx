@@ -7,14 +7,15 @@ interface ContextMenuProps {
     targetId: string;
     isFolder: boolean;
     onClose: () => void;
-    onOpenBackground: () => void;
+    onOpenBackground: (recursive: boolean) => void;
     onSetFlag: (flag: OpenFlag) => void;
     onRename: (newName: string) => void;
     currentFlag: OpenFlag;
+    isSafetyMode?: boolean;
 }
 
 const ContextMenu: React.FC<ContextMenuProps> = ({
-    x, y, isFolder, onClose, onOpenBackground, onSetFlag, onRename, currentFlag
+    x, y, isFolder, onClose, onOpenBackground, onSetFlag, onRename, currentFlag, isSafetyMode
 }) => {
     const menuRef = useRef<HTMLDivElement>(null);
     // Using simple prompt for MVP execution speed, or custom input in menu
@@ -59,20 +60,26 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
             className="context-menu fixed z-50 flex-col"
             style={style}
         >
-            <button className="menu-item" onClick={handleRenameClick}>
-                ✏️ Rename (Virtual)
-            </button>
+            {!isSafetyMode && (
+                <button className="menu-item" onClick={handleRenameClick}>
+                    ✏️ Rename
+                </button>
+            )}
 
             {isFolder ? (
-                <button className="menu-item" onClick={() => { onOpenBackground(); onClose(); }}>
-                    📂 Open All in Background
-                </button>
+                <>
+                    <button className="menu-item" onClick={() => { onOpenBackground(false); onClose(); }}>
+                        📂 Open All (Direct)
+                    </button>
+                    <button className="menu-item" onClick={() => { onOpenBackground(true); onClose(); }}>
+                        📂 Open All (Recursive)
+                    </button>
+                </>
             ) : (
                 <>
-                    <button className="menu-item" onClick={() => { onOpenBackground(); onClose(); }}>
+                    <button className="menu-item" onClick={() => { onOpenBackground(false); onClose(); }}>
                         Open in Background
                     </button>
-
                     <div className="h-[1px] bg-[var(--border-color)] my-1 w-full opacity-50"></div>
 
                     <div className="px-2 py-1 text-xs text-gray-500 font-bold uppercase tracking-wider">Default Action</div>

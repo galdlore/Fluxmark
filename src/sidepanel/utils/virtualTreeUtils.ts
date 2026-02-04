@@ -44,6 +44,33 @@ export const findNode = (nodes: VirtualNode[], id: string): VirtualNode | null =
     return null;
 };
 
+export const findNodeContext = (
+    nodes: VirtualNode[],
+    id: string
+): { parent: VirtualNode | null; index: number; node: VirtualNode } | null => {
+    for (let i = 0; i < nodes.length; i++) {
+        if (nodes[i].id === id) {
+            return { parent: null, index: i, node: nodes[i] };
+        }
+        const child = nodes[i];
+        if (child.children) {
+            const found = findNodeContext(child.children, id);
+            if (found) {
+                // If found in children, if parent was null (from recursive call context), it means strict parent is 'child'
+                // But my recursive logic is: if found in child.children, the recursive call returns { parent: childOrNull, index... }
+                // Actually easier: if found deeply, return it.
+                // If the recursive finding returned parent:null, it means it found it in *its* direct list (which is child.children),
+                // so the parent is `child`.
+                if (found.parent === null) {
+                    return { ...found, parent: child };
+                }
+                return found;
+            }
+        }
+    }
+    return null;
+};
+
 // Update node properties (title, isExpanded)
 export const updateNodeInTree = (nodes: VirtualNode[], id: string, updates: Partial<VirtualNode>): VirtualNode[] => {
     return nodes.map(node => {

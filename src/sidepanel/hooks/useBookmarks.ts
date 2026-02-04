@@ -57,16 +57,23 @@ export const useBookmarks = () => {
             await saveVirtualTree(newTree);
         };
 
+        const onMoved = async () => {
+            // Simplified: Just re-fetch full tree to ensure consistency
+            await fetchBookmarks();
+        };
+
         // 3. Changed: Only update URL if changed? Ignore Title (user custom).
         // actually we can ignore it completely if we are fully decoupled.
         // user asks for "book mark name can be custom in extension".
 
         chrome.bookmarks.onCreated.addListener(onCreated);
         chrome.bookmarks.onRemoved.addListener(onRemoved);
+        chrome.bookmarks.onMoved.addListener(onMoved);
 
         return () => {
             chrome.bookmarks.onCreated.removeListener(onCreated);
             chrome.bookmarks.onRemoved.removeListener(onRemoved);
+            chrome.bookmarks.onMoved.removeListener(onMoved);
         };
     }, []);
 
