@@ -2,6 +2,7 @@
 // We will store flags as a map: { [bookmarkId]: 'NF' | 'RF' | 'NB' }
 // NF: New Foreground, RF: Reload Foregroundf (Current), NB: New Background
 const STORAGE_KEY = 'bookmark_flags';
+const GLOBAL_STORAGE_KEY = 'global_default_flag';
 
 export type OpenFlag = 'NF' | 'RF' | 'NB' | null;
 
@@ -26,6 +27,38 @@ export const getBookmarkFlag = async (id: string): Promise<OpenFlag> => {
     return flags[id] || null;
 };
 
+export const setGlobalDefaultFlag = async (flag: OpenFlag) => {
+    if (flag === null) {
+        await chrome.storage.local.remove(GLOBAL_STORAGE_KEY);
+    } else {
+        await chrome.storage.local.set({ [GLOBAL_STORAGE_KEY]: flag });
+    }
+};
+
+export const getGlobalDefaultFlag = async (): Promise<OpenFlag> => {
+    const result = await chrome.storage.local.get(GLOBAL_STORAGE_KEY);
+    return (result[GLOBAL_STORAGE_KEY] as OpenFlag) || 'NB'; // Default fallback is 'NB'
+};
+
+export const deleteBookmark = async (id: string) => {
+    // For bookmarks API, removeTree is safe for both folders and items? 
+    // Actually removeTree is for folders, remove is for items.
+    // However, removeTree on an item works in some browsers but strictly 'remove' is for items.
+    // Let's try to detect or just use try-catch hierarchy or check if it has children?
+    // The caller usually knows. But easier:
+    try {
+        // Try removeTree first? No, removeTree is heavy.
+        // We can just use the chrome.bookmarks.removeTree for everything?
+        // Documentation says "recursively removes".
+        await chrome.bookmarks.removeTree(id);
+    } catch (e) {
+        // Fallback to remove if it's not a folder or some other error?
+        // Actually removeTree works for non-folders too in Chrome usually.
+        // But safe approach:
+        await chrome.bookmarks.remove(id);
+    }
+};
+
 // Main Action: Open based on settings/flags
 export const openBookmark = async (bookmark: chrome.bookmarks.BookmarkTreeNode, isBackgroundClick = false) => {
     if (!bookmark.url) return;
@@ -38,7 +71,9 @@ export const openBookmark = async (bookmark: chrome.bookmarks.BookmarkTreeNode, 
     }
 
     // 2. Open based on Flags
-    const flag = await getBookmarkFlag(bookmark.id);
+    const localFlag = await getBookmarkFlag(bookmark.id);
+    const globalFlag = await getGlobalDefaultFlag();
+    const flag = localFlag || globalFlag; // Local overrides Global
 
     if (flag === 'NB') {
         await chrome.tabs.create({ url: bookmark.url, active: false });
@@ -52,7 +87,7 @@ export const openBookmark = async (bookmark: chrome.bookmarks.BookmarkTreeNode, 
             await chrome.tabs.create({ url: bookmark.url, active: true });
         }
     } else {
-        // Default Behavior: Background Open (active: false)
+        // Default Fallback (should be covered by globalFlag='NB' but just in case)
         await chrome.tabs.create({ url: bookmark.url, active: false });
     }
 };

@@ -16,7 +16,17 @@ import {
 import { useBookmarks } from './hooks/useBookmarks';
 import BookmarkNode from './components/BookmarkNode';
 import ContextMenu from './components/ContextMenu';
-import { openBookmark, openFolderInBackground, setBookmarkFlag, getBookmarkFlag, type OpenFlag, moveBookmark } from './utils/bookmarkActions';
+import {
+    openBookmark,
+    openFolderInBackground,
+    setBookmarkFlag,
+    getBookmarkFlag,
+    type OpenFlag,
+    moveBookmark,
+    getGlobalDefaultFlag,
+    setGlobalDefaultFlag,
+    deleteBookmark
+} from './utils/bookmarkActions';
 import { type VirtualNode, updateNodeInTree, findNodeContext } from './utils/virtualTreeUtils';
 
 const App = () => {
@@ -30,6 +40,19 @@ const App = () => {
     useEffect(() => {
         localStorage.setItem('safetyMode', String(isSafetyMode));
     }, [isSafetyMode]);
+
+    // Global Default State
+    const [globalDefault, setGlobalDefaultState] = useState<OpenFlag>('NB');
+
+    useEffect(() => {
+        getGlobalDefaultFlag().then(flag => setGlobalDefaultState(flag || 'NB'));
+    }, []);
+
+    const handleGlobalDefaultChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const val = e.target.value as OpenFlag;
+        setGlobalDefaultState(val);
+        await setGlobalDefaultFlag(val);
+    };
 
     // DnD Sensors
     const sensors = useSensors(
@@ -110,6 +133,13 @@ const App = () => {
         }
     };
 
+    const handleDelete = async () => {
+        if (menuData?.node) {
+            await deleteBookmark(menuData.node.id);
+            // No need to explicit refresh, listener in useBookmarks handles it
+        }
+    };
+
     const handleDragEnd = async (event: DragEndEvent) => {
         if (isSafetyMode) return;
         const { active, over } = event;
@@ -122,16 +152,26 @@ const App = () => {
             const overCtx = findNodeContext(bookmarks, overId);
 
             if (activeCtx && overCtx) {
-                // Target Parent: The parent of the node we are dropping OVER (sibling logic)
-                // Note: If we dropped ON a folder with intent to enter, logic would be different.
-                // Here we assume sorting within the list containing 'over'.
-                const newParentId = overCtx.node.parentId || activeCtx.node.parentId || '1'; // Default to bar if lost
+                const overNode = overCtx.node;
+                const isOverFolder = !overNode.url; // simplistic check: if no url, it is folder. (or check children prop exist)
 
-                // Simply move to the index of the item we are hovering over.
-                // Chrome bookmarks API handles re-indexing.
-                // If dragging DOWN: active(0) -> over(2). we want result at index 2.
-                // If dragging UP: active(2) -> over(0). we want result at index 0.
-                await moveBookmark(activeId, newParentId, overCtx.index);
+                // Logic: 
+                // 1. If dropping onto a CLOSED folder -> Move INTO it (append to end)
+                // 2. Otherwise -> Move adjacent (sorting)
+
+                const isOverExpanded = expandedNodes.has(overId);
+
+                if (isOverFolder && !isOverExpanded) {
+                    // Move INTO the folder
+                    // We append to end, so index can be undefined or large number. 
+                    // Chrome API handles large index by appending.
+                    await moveBookmark(activeId, overId, 999999);
+                } else {
+                    // Move ADJACENT (Sorting)
+                    // newParentId is the parent of the node we are over.
+                    const newParentId = overCtx.node.parentId || activeCtx.node.parentId || '1';
+                    await moveBookmark(activeId, newParentId, overCtx.index);
+                }
             }
         }
     };
@@ -139,14 +179,28 @@ const App = () => {
     return (
         <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] p-2">
             <div className="flex items-center justify-between mb-4 px-2">
-                <h1 className="text-lg font-bold tracking-tight">Bookmarks</h1>
-                <button
-                    onClick={() => setIsSafetyMode(!isSafetyMode)}
-                    className="p-1 rounded hover:bg-[var(--bg-hover)] text-xs font-mono border border-[var(--border-color)] opacity-70"
-                    title={isSafetyMode ? "Safety Mode ON (Read Only)" : "Edit Mode ON"}
-                >
-                    {isSafetyMode ? "🔒 View Only" : "🔓 Edit Mode"}
-                </button>
+                <h1 className="text-lg font-bold tracking-tight mr-auto">Bookmarks</h1>
+
+                <div className="flex items-center gap-2">
+                    <select
+                        value={globalDefault || 'NB'}
+                        onChange={handleGlobalDefaultChange}
+                        className="text-xs bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-color)] rounded p-1 outline-none"
+                        title="Global Default Action"
+                    >
+                        <option value="NB">New Tab (Back)</option>
+                        <option value="NF">New Tab (Front)</option>
+                        <option value="RF">Current Tab</option>
+                    </select>
+
+                    <button
+                        onClick={() => setIsSafetyMode(!isSafetyMode)}
+                        className="p-1 rounded hover:bg-[var(--bg-hover)] text-xs font-mono border border-[var(--border-color)] opacity-70"
+                        title={isSafetyMode ? "Safety Mode ON (Read Only)" : "Edit Mode ON"}
+                    >
+                        {isSafetyMode ? "🔒" : "🔓"}
+                    </button>
+                </div>
             </div>
 
             {loading ? (
@@ -188,6 +242,7 @@ const App = () => {
                     onOpenBackground={handleOpenBackground}
                     onSetFlag={handleSetFlag}
                     onRename={handleRename}
+                    onDelete={handleDelete}
                     currentFlag={currentFlag}
                     isSafetyMode={isSafetyMode}
                 />

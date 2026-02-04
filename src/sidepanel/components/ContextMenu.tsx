@@ -10,12 +10,13 @@ interface ContextMenuProps {
     onOpenBackground: (recursive: boolean) => void;
     onSetFlag: (flag: OpenFlag) => void;
     onRename: (newName: string) => void;
+    onDelete: () => void;
     currentFlag: OpenFlag;
     isSafetyMode?: boolean;
 }
 
 const ContextMenu: React.FC<ContextMenuProps> = ({
-    x, y, isFolder, onClose, onOpenBackground, onSetFlag, onRename, currentFlag, isSafetyMode
+    x, y, isFolder, onClose, onOpenBackground, onSetFlag, onRename, onDelete, currentFlag, isSafetyMode
 }) => {
     const menuRef = useRef<HTMLDivElement>(null);
     // Using simple prompt for MVP execution speed, or custom input in menu
@@ -98,6 +99,20 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
                     <button className="menu-item justify-between" onClick={() => { onSetFlag(null); onClose(); }}>
                         <span>Default (Background)</span>
                         {currentFlag === null && <span>✓</span>}
+                    </button>
+                </>
+            )}
+
+            {!isSafetyMode && (
+                <>
+                    <div className="h-[1px] bg-[var(--border-color)] my-1 w-full opacity-50"></div>
+                    <button className="menu-item text-red-500 hover:bg-red-900/20" onClick={() => {
+                        if (window.confirm('Are you sure you want to delete this?')) {
+                            onDelete();
+                            onClose();
+                        }
+                    }}>
+                        🗑️ Delete
                     </button>
                 </>
             )}
