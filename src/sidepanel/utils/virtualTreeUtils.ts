@@ -121,14 +121,57 @@ export const appendNodeToParent = (nodes: VirtualNode[], parentId: string, newNo
 };
 
 // Initial sync check
+// Reconcile Native Tree (Master Structure) with Virtual Tree (Metadata Master)
+const reconcileTrees = (nativeNodes: chrome.bookmarks.BookmarkTreeNode[], virtualNodes: VirtualNode[]): VirtualNode[] => {
+    // 1. Create a Flat Map of Virtual Nodes for quick ID lookup
+    const virtualMap = new Map<string, VirtualNode>();
+    const flatten = (nodes: VirtualNode[]) => {
+        nodes.forEach(node => {
+            virtualMap.set(node.id, node);
+            if (node.children) flatten(node.children);
+        });
+    };
+    flatten(virtualNodes);
+
+    // 2. Map Native Tree to Virtual Tree, preserving virtual props where ID matches
+    const mapNativeToVirtual = (nNode: chrome.bookmarks.BookmarkTreeNode): VirtualNode => {
+        const vNode = virtualMap.get(nNode.id);
+
+        return {
+            id: nNode.id,
+            // PRESERVE CUSTOM TITLE: Use vNode.title if exists, else native
+            title: vNode ? vNode.title : nNode.title,
+            url: nNode.url,
+            parentId: nNode.parentId,
+            // PRESERVE EXPANDED STATE
+            isExpanded: vNode ? vNode.isExpanded : false,
+            // RECURSE CHILDREN from Native Structure
+            children: nNode.children ? nNode.children.map(mapNativeToVirtual) : undefined
+        };
+    };
+
+    return nativeNodes.map(mapNativeToVirtual);
+};
+
+// Initial sync check
 export const initializeVirtualTree = async () => {
-    const existing = await loadVirtualTree();
-    if (!existing || existing.length === 0) {
-        const root = await chrome.bookmarks.getTree();
-        // Usually root[0] is root, we want its children (Bar, Other, etc.)
-        const initialTree = convertNativeToVirtual(root[0].children || []);
-        await saveVirtualTree(initialTree);
-        return initialTree;
+    const existingVirtual = await loadVirtualTree();
+    const nativeRoot = await chrome.bookmarks.getTree();
+
+    // Usually root[0] is root, we want its children (Bar, Other, etc.) which act as our top level
+    const nativeTopLevel = nativeRoot[0].children || [];
+
+    let finalTree: VirtualNode[];
+
+    if (!existingVirtual || existingVirtual.length === 0) {
+        // First Run: Just convert native
+        finalTree = convertNativeToVirtual(nativeTopLevel);
+    } else {
+        // Subsequent Runs: Reconcile
+        // Use Native structure but keep Virtual metadata (Titles, Expanded)
+        finalTree = reconcileTrees(nativeTopLevel, existingVirtual);
     }
-    return existing;
+
+    await saveVirtualTree(finalTree);
+    return finalTree;
 };

@@ -4,7 +4,6 @@ import {
     initializeVirtualTree,
     saveVirtualTree,
     loadVirtualTree,
-    appendNodeToParent,
     removeNodeFromTree
 } from '../utils/virtualTreeUtils';
 
@@ -13,11 +12,11 @@ export const useBookmarks = () => {
     const [loading, setLoading] = useState(true);
 
     // Initial Load
-    const fetchBookmarks = async () => {
-        setLoading(true);
+    const fetchBookmarks = async (silent = false) => {
+        if (!silent) setLoading(true);
         const tree = await initializeVirtualTree();
         setBookmarks(tree);
-        setLoading(false);
+        if (!silent) setLoading(false);
     };
 
     // Force Save (used by DragEnd and Rename)
@@ -31,22 +30,9 @@ export const useBookmarks = () => {
 
         // Listeners for Chrome events (Sync Existence)
         // 1. Created: Add to virtual tree (simple append)
-        const onCreated = async (_id: string, bookmark: chrome.bookmarks.BookmarkTreeNode) => {
-            const currentTree = await loadVirtualTree() || [];
-            const newNode: VirtualNode = {
-                id: bookmark.id,
-                title: bookmark.title,
-                url: bookmark.url,
-                parentId: bookmark.parentId,
-                children: bookmark.children ? [] : undefined // Simplified, usually new default is empty
-            };
-            // For now, simple append. If parent is not found (e.g. root), it might be tricky.
-            // We assume parentId aligns with our structure.
-            const newTree = appendNodeToParent(currentTree, bookmark.parentId || '0', newNode);
-            // If no change (parent not found), we might push to root?
-            // Lets keep it safe.
-            setBookmarks(newTree);
-            await saveVirtualTree(newTree);
+        const onCreated = async (_id: string, _bookmark: chrome.bookmarks.BookmarkTreeNode) => {
+            // Re-fetch to ensure correct order (index) from native tree
+            await fetchBookmarks(true);
         };
 
         // 2. Removed: Remove from virtual tree
@@ -59,7 +45,8 @@ export const useBookmarks = () => {
 
         const onMoved = async () => {
             // Simplified: Just re-fetch full tree to ensure consistency
-            await fetchBookmarks();
+            // Silent refresh to keep scroll position!
+            await fetchBookmarks(true);
         };
 
         // 3. Changed: Only update URL if changed? Ignore Title (user custom).
@@ -77,5 +64,6 @@ export const useBookmarks = () => {
         };
     }, []);
 
-    return { bookmarks, loading, updateBookmarks, refresh: fetchBookmarks };
+    // Default refresh to silent=true because usually manual refresh is for updates, initial load is internal
+    return { bookmarks, loading, updateBookmarks, refresh: () => fetchBookmarks(true) };
 };

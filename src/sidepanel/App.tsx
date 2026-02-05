@@ -25,7 +25,8 @@ import {
     moveBookmark,
     getGlobalDefaultFlag,
     setGlobalDefaultFlag,
-    deleteBookmark
+    deleteBookmark,
+    createBookmarkFolder
 } from './utils/bookmarkActions';
 import { type VirtualNode, updateNodeInTree, findNodeContext } from './utils/virtualTreeUtils';
 
@@ -151,33 +152,91 @@ const App = () => {
             const activeCtx = findNodeContext(bookmarks, activeId);
             const overCtx = findNodeContext(bookmarks, overId);
 
-            if (activeCtx && overCtx) {
-                const overNode = overCtx.node;
-                const isOverFolder = !overNode.url; // simplistic check: if no url, it is folder. (or check children prop exist)
-
-                // Logic: 
-                // 1. If dropping onto a CLOSED folder -> Move INTO it (append to end)
-                // 2. Otherwise -> Move adjacent (sorting)
-
-                const isOverExpanded = expandedNodes.has(overId);
-
-                if (isOverFolder && !isOverExpanded) {
-                    // Move INTO the folder
-                    // We append to end, so index can be undefined or large number. 
-                    // Chrome API handles large index by appending.
-                    await moveBookmark(activeId, overId, 999999);
-                } else {
-                    // Move ADJACENT (Sorting)
-                    // newParentId is the parent of the node we are over.
-                    const newParentId = overCtx.node.parentId || activeCtx.node.parentId || '1';
-                    await moveBookmark(activeId, newParentId, overCtx.index);
-                }
+            if (!activeCtx || !overCtx) {
+                console.warn('DnD: Could not find context for active or over node.', { activeId, overId });
+                return;
             }
+
+            const overNode = overCtx.node;
+            const isOverFolder = !overNode.url;
+            const isOverExpanded = expandedNodes.has(overId);
+
+            // Debug logs
+            console.log('DnD Start:', { activeId, overId, activeCtx, overCtx, isOverFolder, isOverExpanded });
+
+            // 0. Safety Check: Do not move Root Nodes (Bar, Other, etc)
+            if (activeCtx.node.parentId === '0') {
+                console.warn('Cannot move root folders (parentId is 0).');
+                return;
+            }
+
+            let result: boolean | string = false;
+            // logic
+            if (isOverFolder && !isOverExpanded) {
+                // Move INTO the folder
+                console.log(`Moving ${activeId} INTO ${overId}`);
+                result = await moveBookmark(activeId, overId);
+            } else {
+                // Move ADJACENT (Sorting)
+                const targetParentId = overCtx.node.parentId || activeCtx.node.parentId;
+
+                if (!targetParentId) {
+                    console.error('Target Parent ID could not be determined. Aborting move.');
+                    await refresh();
+                    return;
+                }
+
+                // Prevention: Do not allow moving to Root Level (parentId '0')
+                if (targetParentId === '0') {
+                    console.warn('Cannot move bookmark to Root Level (parentId 0).');
+                    return;
+                }
+
+                // Fix for Same-Folder Move Down (Off-by-one issue)
+                // When moving down (active < over), Chrome inserts *before* the index.
+                // To swap effectively (place *after* the over node), we need +1.
+                // When moving up, 'over.index' is correct (insert before over).
+                let newIndex = overCtx.index;
+                const isSameFolder = targetParentId === activeCtx.node.parentId;
+
+                if (isSameFolder && activeCtx.index < overCtx.index) {
+                    newIndex = overCtx.index + 1;
+                }
+
+                console.log(`Moving ${activeId} next to ${overId} (Parent: ${targetParentId}, BaseIndex: ${overCtx.index}, NewIndex: ${newIndex})`);
+                result = await moveBookmark(activeId, targetParentId, newIndex);
+            }
+
+            if (result !== true) {
+                console.error('Move operation returned failure:', result);
+                await refresh();
+            } else {
+                console.log('Move operation reported success.');
+            }
+        }
+    };
+
+    const handleNewFolder = async () => {
+        if (isSafetyMode) return;
+        if (menuData?.node) {
+            const ctx = findNodeContext(bookmarks, menuData.node.id);
+            if (!ctx) return;
+
+            const parentId = ctx.node.parentId;
+            if (!parentId || parentId === '0') {
+                // If root, we might want to handle it (e.g. create in Bar or Other)
+                // But usually items context parent is valid.
+                return;
+            }
+
+            // Insert AFTER the current node
+            await createBookmarkFolder(parentId, ctx.index + 1, 'New Folder');
         }
     };
 
     return (
         <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] p-2">
+            {/* ... existing header ... */}
             <div className="flex items-center justify-between mb-4 px-2">
                 <h1 className="text-lg font-bold tracking-tight mr-auto">Bookmarks</h1>
 
@@ -243,7 +302,9 @@ const App = () => {
                     onSetFlag={handleSetFlag}
                     onRename={handleRename}
                     onDelete={handleDelete}
+                    onNewFolder={handleNewFolder}
                     currentFlag={currentFlag}
+                    currentTitle={menuData.node.title}
                     isSafetyMode={isSafetyMode}
                 />
             )}

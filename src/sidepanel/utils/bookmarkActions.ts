@@ -153,10 +153,23 @@ export const openFolderInBackground = async (folderNode: chrome.bookmarks.Bookma
     // Note: We intentionally await sequentially to avoid overloading browser process too fast, though parallel is also possible.
 };
 
-export const moveBookmark = async (id: string, parentId: string, index: number) => {
+export const moveBookmark = async (id: string, parentId: string, index?: number): Promise<boolean | string> => {
     try {
         await chrome.bookmarks.move(id, { parentId, index });
-    } catch (error) {
+        return true;
+    } catch (error: any) {
         console.error('Failed to move bookmark:', error);
+        return error.message || JSON.stringify(error);
+    }
+};
+export const createBookmarkFolder = async (parentId: string, index?: number, title: string = 'New Folder'): Promise<void> => {
+    try {
+        await chrome.bookmarks.create({
+            parentId,
+            index,
+            title
+        });
+    } catch (error) {
+        console.error('Failed to create folder:', error);
     }
 };

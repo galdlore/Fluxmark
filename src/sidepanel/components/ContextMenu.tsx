@@ -11,19 +11,16 @@ interface ContextMenuProps {
     onSetFlag: (flag: OpenFlag) => void;
     onRename: (newName: string) => void;
     onDelete: () => void;
+    onNewFolder: () => void;
     currentFlag: OpenFlag;
+    currentTitle: string;
     isSafetyMode?: boolean;
 }
 
 const ContextMenu: React.FC<ContextMenuProps> = ({
-    x, y, isFolder, onClose, onOpenBackground, onSetFlag, onRename, onDelete, currentFlag, isSafetyMode
+    x, y, isFolder, onClose, onOpenBackground, onSetFlag, onRename, onDelete, onNewFolder, currentFlag, currentTitle, isSafetyMode
 }) => {
     const menuRef = useRef<HTMLDivElement>(null);
-    // Using simple prompt for MVP execution speed, or custom input in menu
-    // Let's use simple prompt triggered by menu item for now, or replace menu with input.
-
-    // Actually, standard interaction is click -> open prompt or inline edit.
-    // We'll trigger prompt from click.
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -36,35 +33,60 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
     }, [onClose]);
 
     const handleRenameClick = () => {
-        // Simplified: use browser prompt for MVP (custom modal is better for Premium feel but requires more code)
-        // Since user wants Premium, let's just make sure it works first.
-        // We can use a non-blocking UI later.
-        // Actually prompt is blocking but effective for this step.
-        // We need to pass current name? We don't have it in props.
-        // We'll just ask for "New Name".
-        const name = prompt("Enter new name:");
+        const name = prompt("Enter new name:", currentTitle);
         if (name) {
             onRename(name);
             onClose();
         }
     };
 
+    const [position, setPosition] = React.useState({ top: y, left: x });
+
+    React.useLayoutEffect(() => {
+        if (menuRef.current) {
+            const rect = menuRef.current.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+
+            let newTop = y;
+            let newLeft = x;
+
+            // Check Bottom Overflow
+            if (y + rect.height > viewportHeight) {
+                // If it overflows bottom, position it ABOVE the cursor
+                newTop = y - rect.height;
+            }
+
+            // Check Right Overflow
+            if (x + rect.width > viewportWidth) {
+                newLeft = viewportWidth - rect.width - 10;
+            }
+
+            setPosition({ top: Math.max(0, newTop), left: Math.max(0, newLeft) });
+        }
+    }, [x, y]);
+
     // Adjust position if out of viewport
     const style = {
-        top: Math.min(y, window.innerHeight - 250) + 'px',
-        left: Math.min(x, window.innerWidth - 180) + 'px',
+        top: `${position.top}px`,
+        left: `${position.left}px`,
     };
 
     return (
         <div
             ref={menuRef}
-            className="context-menu fixed z-50 flex-col"
+            className="context-menu fixed z-50 flex-col shadow-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] rounded-md overflow-hidden min-w-[180px]"
             style={style}
         >
             {!isSafetyMode && (
-                <button className="menu-item" onClick={handleRenameClick}>
-                    ✏️ Rename
-                </button>
+                <>
+                    <button className="menu-item" onClick={() => { onNewFolder(); onClose(); }}>
+                        📁 New Folder
+                    </button>
+                    <button className="menu-item" onClick={handleRenameClick}>
+                        ✏️ Rename
+                    </button>
+                </>
             )}
 
             {isFolder ? (
