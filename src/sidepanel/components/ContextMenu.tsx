@@ -97,6 +97,20 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
                     <button className="menu-item" onClick={() => { onOpenBackground(true); onClose(); }}>
                         📂 Open All (Recursive)
                     </button>
+                    <div className="h-[1px] bg-[var(--border-color)] my-1 w-full opacity-50"></div>
+                    <div className="px-2 py-1 text-xs text-gray-500 font-bold uppercase tracking-wider">Set Children Open Mode</div>
+                    <button className="menu-item" onClick={() => { onSetFlag('NB'); onClose(); }}>
+                        Set Mode: New Tab (Back)
+                    </button>
+                    <button className="menu-item" onClick={() => { onSetFlag('NF'); onClose(); }}>
+                        Set Mode: New Tab (Front)
+                    </button>
+                    <button className="menu-item" onClick={() => { onSetFlag('RF'); onClose(); }}>
+                        Set Mode: Current Tab
+                    </button>
+                    <button className="menu-item" onClick={() => { onSetFlag(null); onClose(); }}>
+                        Reset All (Clear)
+                    </button>
                 </>
             ) : (
                 <>

@@ -62,7 +62,7 @@ const BookmarkNode: React.FC<BookmarkNodeProps> = ({ node, depth = 0, onContextM
         if (!isFolder) {
             getBookmarkFlag(node.id).then(setFlag);
         }
-    }, [node.id, isFolder]);
+    }, [node.id, isFolder, node]); // added node to trigger refresh on tree update
 
     const handleClick = (e: React.MouseEvent) => {
         e.preventDefault();

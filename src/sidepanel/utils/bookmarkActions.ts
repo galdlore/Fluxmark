@@ -40,23 +40,68 @@ export const getGlobalDefaultFlag = async (): Promise<OpenFlag> => {
     return (result[GLOBAL_STORAGE_KEY] as OpenFlag) || 'NB'; // Default fallback is 'NB'
 };
 
+// Batch set flags
+export const setBookmarkFlags = async (flagMap: FlagMap) => {
+    const result = await chrome.storage.local.get(STORAGE_KEY);
+    const existingFlags = (result[STORAGE_KEY] || {}) as FlagMap;
+    // Merge
+    const newFlags = { ...existingFlags, ...flagMap };
+
+    // Clean up nulls
+    Object.keys(flagMap).forEach(key => {
+        if (flagMap[key] === null) {
+            delete newFlags[key];
+        }
+    });
+
+    await chrome.storage.local.set({ [STORAGE_KEY]: newFlags });
+};
+
 export const deleteBookmark = async (id: string) => {
-    // For bookmarks API, removeTree is safe for both folders and items? 
-    // Actually removeTree is for folders, remove is for items.
-    // However, removeTree on an item works in some browsers but strictly 'remove' is for items.
-    // Let's try to detect or just use try-catch hierarchy or check if it has children?
-    // The caller usually knows. But easier:
+    // ... existing ...
     try {
-        // Try removeTree first? No, removeTree is heavy.
-        // We can just use the chrome.bookmarks.removeTree for everything?
-        // Documentation says "recursively removes".
         await chrome.bookmarks.removeTree(id);
     } catch (e) {
-        // Fallback to remove if it's not a folder or some other error?
-        // Actually removeTree works for non-folders too in Chrome usually.
-        // But safe approach:
         await chrome.bookmarks.remove(id);
     }
+};
+
+// Recursive Flag Setting
+export const setFolderFlag = async (folderNode: chrome.bookmarks.BookmarkTreeNode, flag: OpenFlag, recursive = true) => {
+    // 1. Collect all bookmark IDs (not folders, unless we want to flag folders? No, flags are for items)
+    // Actually our getBookmarkFlag checks based on ID.
+    // So we need to find all child items.
+
+    const ids: string[] = [];
+    const traverse = (node: chrome.bookmarks.BookmarkTreeNode) => {
+        if (node.url) {
+            ids.push(node.id);
+        }
+        if (node.children) {
+            if (recursive) {
+                node.children.forEach(traverse);
+            } else {
+                node.children.forEach(child => {
+                    if (child.url) ids.push(child.id);
+                });
+            }
+        }
+    };
+
+    // If folderNode itself is the root to start from
+    if (folderNode.children) {
+        folderNode.children.forEach(traverse);
+    }
+
+    if (ids.length === 0) return;
+
+    // 2. batch update
+    const updateMap: FlagMap = {};
+    ids.forEach(id => {
+        updateMap[id] = flag;
+    });
+
+    await setBookmarkFlags(updateMap);
 };
 
 // Main Action: Open based on settings/flags
@@ -173,3 +218,46 @@ export const createBookmarkFolder = async (parentId: string, index?: number, tit
         console.error('Failed to create folder:', error);
     }
 };
+
+export const saveSession = async () => {
+    try {
+        // 1. Get all tabs in current window
+        const tabs = await chrome.tabs.query({ currentWindow: true });
+        if (tabs.length === 0) return;
+
+        // 2. Create "Session YYYY-MM-DD HH:mm" Folder
+        const now = new Date();
+        const folderName = `Session ${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+        // Create in "Other Bookmarks" (usually root '2' is Other, but let's just use '2' or find it)
+        // Ideally we search for "Other Bookmarks" or just dump in root (which might be '0' or '1' or '2')
+        // '1' is usually Bookmark Bar, '2' is Other Bookmarks. Let's try '2'.
+        // Safe fallback: '1' if '2' fails? No, let's just use '2' for Other Bookmarks or '1' for Bar if user prefers.
+        // Let's us '2' (Other Bookmarks) as default for session dumps to avoid cluttering bar.
+        const parentId = '2';
+
+        const folder = await chrome.bookmarks.create({
+            parentId,
+            title: folderName
+        });
+
+        if (!folder) return;
+
+        // 3. Save all tabs
+        for (const tab of tabs) {
+            if (tab.url && tab.title) {
+                await chrome.bookmarks.create({
+                    parentId: folder.id,
+                    title: tab.title,
+                    url: tab.url
+                });
+            }
+        }
+        return true;
+
+    } catch (error) {
+        console.error('Failed to save session:', error);
+        return false;
+    }
+};
+

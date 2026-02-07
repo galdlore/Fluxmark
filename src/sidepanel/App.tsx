@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     DndContext,
     closestCenter,
@@ -26,9 +26,13 @@ import {
     getGlobalDefaultFlag,
     setGlobalDefaultFlag,
     deleteBookmark,
-    createBookmarkFolder
+    createBookmarkFolder,
+    saveSession,
+    setFolderFlag
 } from './utils/bookmarkActions';
 import { type VirtualNode, updateNodeInTree, findNodeContext } from './utils/virtualTreeUtils';
+import { searchBookmarks } from './utils/searchUtils';
+import HelpView from './components/HelpView';
 
 const App = () => {
     const { bookmarks, loading, updateBookmarks, refresh } = useBookmarks();
@@ -54,6 +58,16 @@ const App = () => {
         setGlobalDefaultState(val);
         await setGlobalDefaultFlag(val);
     };
+
+    // Search State
+    const [searchTerm, setSearchTerm] = useState('');
+    const searchResults = useMemo(() => {
+        if (!searchTerm.trim()) return [];
+        return searchBookmarks(bookmarks, searchTerm);
+    }, [bookmarks, searchTerm]);
+
+    // Help Modal State
+    const [isHelpOpen, setIsHelpOpen] = useState(false);
 
     // DnD Sensors
     const sensors = useSensors(
@@ -110,9 +124,31 @@ const App = () => {
 
     const handleSetFlag = async (flag: OpenFlag) => {
         if (menuData?.node) {
-            await setBookmarkFlag(menuData.node.id, flag);
-            // Refresh to update UI indicators (re-fetch tree)
-            // But we keep expandedNodes state so folders stay open!
+            if (menuData.node.children) {
+                // Folder - Bulk Set
+                // Need to convert VirtualNode to BookmarkTreeNode-like for helper
+                // OR we just use recursive ID finding helper we wrote.
+                // Our setFolderFlag expects a chrome.bookmarks.BookmarkTreeNode.
+                // We need to fetch it ? Or just map it.
+                // Map:
+                const nodeLike = {
+                    id: menuData.node.id,
+                    children: menuData.node.children as any
+                } as chrome.bookmarks.BookmarkTreeNode;
+
+                // However, menuData.node (VirtualNode) children are VirtualNodes.
+                // setFolderFlag iterates .children recursively.
+                // VirtualNode structure is compatible enough (children is array, url/id property exists).
+                // Types might complain.
+                // Let's modify setFolderFlag or cast here.
+                // Import setFolderFlag first... (added to imports in next step or implied?)
+
+                // wait, I need to import setFolderFlag in App.tsx
+                await setFolderFlag(nodeLike, flag, true);
+            } else {
+                // Single Item
+                await setBookmarkFlag(menuData.node.id, flag);
+            }
             refresh();
         }
     };
@@ -142,7 +178,7 @@ const App = () => {
     };
 
     const handleDragEnd = async (event: DragEndEvent) => {
-        if (isSafetyMode) return;
+        if (isSafetyMode || searchTerm) return; // Disable DnD in search mode
         const { active, over } = event;
 
         if (active.id !== over?.id && over) {
@@ -236,34 +272,74 @@ const App = () => {
 
     return (
         <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] p-2">
-            {/* ... existing header ... */}
-            <div className="flex items-center justify-between mb-4 px-2">
-                <h1 className="text-lg font-bold tracking-tight mr-auto">Bookmarks</h1>
+            {/* Header */}
+            <div className="flex flex-col gap-2 mb-4 px-2">
+                <div className="flex items-center justify-between">
+                    <h1 className="text-lg font-bold tracking-tight mr-auto">Bookmarks</h1>
 
-                <div className="flex items-center gap-2">
-                    <select
-                        value={globalDefault || 'NB'}
-                        onChange={handleGlobalDefaultChange}
-                        className="text-xs bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-color)] rounded p-1 outline-none"
-                        title="Global Default Action"
-                    >
-                        <option value="NB">New Tab (Back)</option>
-                        <option value="NF">New Tab (Front)</option>
-                        <option value="RF">Current Tab</option>
-                    </select>
+                    <div className="flex items-center gap-2">
+                        {/* Global Default Selector */}
+                        <select
+                            value={globalDefault || 'NB'}
+                            onChange={handleGlobalDefaultChange}
+                            className="text-xs bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-color)] rounded p-1 outline-none"
+                            title="Global Default Action"
+                        >
+                            <option value="NB">New Tab (Back)</option>
+                            <option value="NF">New Tab (Front)</option>
+                            <option value="RF">Current Tab</option>
+                        </select>
 
-                    <button
-                        onClick={() => setIsSafetyMode(!isSafetyMode)}
-                        className="p-1 rounded hover:bg-[var(--bg-hover)] text-xs font-mono border border-[var(--border-color)] opacity-70"
-                        title={isSafetyMode ? "Safety Mode ON (Read Only)" : "Edit Mode ON"}
-                    >
-                        {isSafetyMode ? "🔒" : "🔓"}
-                    </button>
+                        {/* Save Session Button */}
+                        <button
+                            onClick={async () => {
+                                if (isSafetyMode) return;
+                                const success = await saveSession();
+                                if (success) refresh();
+                            }}
+                            className="p-1 rounded hover:bg-[var(--bg-hover)] text-xs border border-[var(--border-color)] opacity-70"
+                            title="Save Current Session (Tabs to Folder)"
+                            disabled={isSafetyMode}
+                        >
+                            💾
+                        </button>
+
+                        {/* Safety Mode Toggle */}
+                        <button
+                            onClick={() => setIsSafetyMode(!isSafetyMode)}
+                            className="p-1 rounded hover:bg-[var(--bg-hover)] text-xs font-mono border border-[var(--border-color)] opacity-70"
+                            title={isSafetyMode ? "Safety Mode ON (Read Only)" : "Edit Mode ON"}
+                        >
+                            {isSafetyMode ? "🔒" : "🔓"}
+                        </button>
+
+                        {/* Help Button */}
+                        <button
+                            onClick={() => setIsHelpOpen(true)}
+                            className="p-1 rounded hover:bg-[var(--bg-hover)] text-xs border border-[var(--border-color)] opacity-70 font-bold w-6 h-6 flex items-center justify-center"
+                            title="Help & Usage"
+                        >
+                            ?
+                        </button>
+                    </div>
                 </div>
+
+
+                {/* Search Input */}
+                <input
+                    type="text"
+                    placeholder="Search bookmarks..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full text-xs bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-color)] rounded p-1.5 outline-none focus:border-[var(--accent-color)]"
+                />
             </div>
 
             {loading ? (
                 <p className="text-sm text-[var(--text-secondary)] text-center py-4">Loading...</p>
+            ) : isHelpOpen ? (
+                // Help View (Replace Bookmark Tree)
+                <HelpView onClose={() => setIsHelpOpen(false)} />
             ) : (
                 <DndContext
                     sensors={sensors}
@@ -271,22 +347,53 @@ const App = () => {
                     onDragEnd={handleDragEnd}
                 >
                     <div className="space-y-1">
-                        <SortableContext
-                            items={bookmarks.map(b => b.id)}
-                            strategy={verticalListSortingStrategy}
-                            disabled={isSafetyMode}
-                        >
-                            {bookmarks.map(node => (
-                                <BookmarkNode
-                                    key={node.id}
-                                    node={node}
-                                    onContextMenu={handleContextMenu}
-                                    expandedNodes={expandedNodes}
-                                    onToggle={toggleNode}
-                                    disabled={isSafetyMode}
-                                />
-                            ))}
-                        </SortableContext>
+                        {searchTerm ? (
+                            // Search Results (Flat List)
+                            searchResults.length > 0 ? (
+                                <div className="space-y-1">
+                                    <p className="text-xs text-[var(--text-secondary)] px-2 pb-2">
+                                        Found {searchResults.length} result(s)
+                                    </p>
+                                    <SortableContext
+                                        items={searchResults.map(b => b.id)}
+                                        strategy={verticalListSortingStrategy}
+                                        disabled={true} // Disable sorting in search results
+                                    >
+                                        {searchResults.map(node => (
+                                            <BookmarkNode
+                                                key={node.id}
+                                                node={node}
+                                                onContextMenu={handleContextMenu}
+                                                expandedNodes={expandedNodes}
+                                                onToggle={toggleNode}
+                                                disabled={true}
+                                                depth={0} // Flat view
+                                            />
+                                        ))}
+                                    </SortableContext>
+                                </div>
+                            ) : (
+                                <p className="text-sm text-[var(--text-secondary)] text-center py-4">No results found.</p>
+                            )
+                        ) : (
+                            // Standard Tree View
+                            <SortableContext
+                                items={bookmarks.map(b => b.id)}
+                                strategy={verticalListSortingStrategy}
+                                disabled={isSafetyMode}
+                            >
+                                {bookmarks.map(node => (
+                                    <BookmarkNode
+                                        key={node.id}
+                                        node={node}
+                                        onContextMenu={handleContextMenu}
+                                        expandedNodes={expandedNodes}
+                                        onToggle={toggleNode}
+                                        disabled={isSafetyMode}
+                                    />
+                                ))}
+                            </SortableContext>
+                        )}
                     </div>
                 </DndContext>
             )}

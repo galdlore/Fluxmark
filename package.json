@@ -1,7 +1,7 @@
 {
   "name": "my-extension",
   "private": false,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Efficient bookmark manager for Chrome Side Panel",
   "repository": {
     "type": "git",
