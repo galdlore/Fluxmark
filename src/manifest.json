@@ -30,7 +30,8 @@
     "sidePanel",
     "tabs",
     "storage",
-    "favicon"
+    "favicon",
+    "unlimitedStorage"
   ],
   "commands": {
     "_execute_action": {

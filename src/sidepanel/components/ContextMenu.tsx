@@ -11,14 +11,16 @@ interface ContextMenuProps {
     onSetFlag: (flag: OpenFlag) => void;
     onRename: (newName: string) => void;
     onDelete: () => void;
+    onRestore: () => void;
     onNewFolder: () => void;
     currentFlag: OpenFlag;
     currentTitle: string;
     isSafetyMode?: boolean;
+    isHidden?: boolean;
 }
 
 const ContextMenu: React.FC<ContextMenuProps> = ({
-    x, y, isFolder, onClose, onOpenBackground, onSetFlag, onRename, onDelete, onNewFolder, currentFlag, currentTitle, isSafetyMode
+    x, y, isFolder, onClose, onOpenBackground, onSetFlag, onRename, onDelete, onRestore, onNewFolder, currentFlag, currentTitle, isSafetyMode, isHidden
 }) => {
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -142,14 +144,21 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
             {!isSafetyMode && (
                 <>
                     <div className="h-[1px] bg-[var(--border-color)] my-1 w-full opacity-50"></div>
-                    <button className="menu-item text-red-500 hover:bg-red-900/20" onClick={() => {
-                        if (window.confirm('Are you sure you want to delete this?')) {
+                    {isHidden ? (
+                        <button className="menu-item text-green-600 hover:bg-green-900/20" onClick={() => {
+                            onRestore();
+                            onClose();
+                        }}>
+                            👁️ Restore
+                        </button>
+                    ) : (
+                        <button className="menu-item text-red-500 hover:bg-red-900/20" onClick={() => {
                             onDelete();
                             onClose();
-                        }
-                    }}>
-                        🗑️ Delete
-                    </button>
+                        }}>
+                            👁️ Hide
+                        </button>
+                    )}
                 </>
             )}
         </div>

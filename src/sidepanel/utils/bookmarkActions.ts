@@ -1,6 +1,9 @@
-// Helper to get stored flags. 
-// We will store flags as a map: { [bookmarkId]: 'NF' | 'RF' | 'NB' }
-// NF: New Foreground, RF: Reload Foregroundf (Current), NB: New Background
+import {
+    loadVirtualState,
+    saveVirtualState
+} from './virtualTreeUtils';
+
+// --- Flags ---
 const STORAGE_KEY = 'bookmark_flags';
 const GLOBAL_STORAGE_KEY = 'global_default_flag';
 
@@ -10,6 +13,7 @@ interface FlagMap {
     [id: string]: OpenFlag | undefined;
 }
 
+// Re-implement Flag getters/setters
 export const setBookmarkFlag = async (id: string, flag: OpenFlag) => {
     const result = await chrome.storage.local.get(STORAGE_KEY);
     const flags = (result[STORAGE_KEY] || {}) as FlagMap;
@@ -37,85 +41,144 @@ export const setGlobalDefaultFlag = async (flag: OpenFlag) => {
 
 export const getGlobalDefaultFlag = async (): Promise<OpenFlag> => {
     const result = await chrome.storage.local.get(GLOBAL_STORAGE_KEY);
-    return (result[GLOBAL_STORAGE_KEY] as OpenFlag) || 'NB'; // Default fallback is 'NB'
+    return (result[GLOBAL_STORAGE_KEY] as OpenFlag) || 'NB';
 };
 
-// Batch set flags
 export const setBookmarkFlags = async (flagMap: FlagMap) => {
     const result = await chrome.storage.local.get(STORAGE_KEY);
     const existingFlags = (result[STORAGE_KEY] || {}) as FlagMap;
-    // Merge
     const newFlags = { ...existingFlags, ...flagMap };
-
-    // Clean up nulls
     Object.keys(flagMap).forEach(key => {
-        if (flagMap[key] === null) {
-            delete newFlags[key];
-        }
+        if (flagMap[key] === null) delete newFlags[key];
     });
-
     await chrome.storage.local.set({ [STORAGE_KEY]: newFlags });
 };
 
-export const deleteBookmark = async (id: string) => {
-    // ... existing ...
+// --- Virtual Actions ---
+
+// 1. Virtual Move (Sort & Folder Change)
+// 1. Virtual Move (Sort & Folder Change) -> Now NATIVE Move + Virtual Sort
+export const moveBookmark = async (id: string, targetParentId: string, index?: number): Promise<boolean | string> => {
     try {
-        await chrome.bookmarks.removeTree(id);
-    } catch (e) {
-        await chrome.bookmarks.remove(id);
+        const state = await loadVirtualState();
+
+        // 1. Native Move
+        // We always move natively first to ensure persistence.
+        // For index: handling native index vs virtual index is complex.
+        // We will move to the folder (append) natively, and rely on Virtual Order for exact specific position.
+        // If we tried to sync native index, 'hidden' items would mess it up.
+        await chrome.bookmarks.move(id, { parentId: targetParentId });
+
+        // 2. Identify and Update Virtual Stat (Order)
+        // Since we moved natively, we don't need 'virtualParent' anymore for this item (it matches native).
+        if (state.virtualParent[id]) {
+            delete state.virtualParent[id];
+        }
+
+        // 3. Update Order in Target Parent
+        let newOrder = state.order[targetParentId];
+        if (!newOrder) {
+            // Initialize with current children if order doesn't exist
+            const children = await chrome.bookmarks.getChildren(targetParentId);
+            newOrder = children.map(c => c.id);
+            // Ensure our ID is in there (it should be since we moved it, but async/race might vary)
+            if (!newOrder.includes(id)) newOrder.push(id);
+        }
+
+        // Remove from old order if exists?
+        // We don't easily know old parent here without query, but if we found it in state:
+        // (Actually, iterating all orders to remove ID is safe)
+        Object.keys(state.order).forEach(pid => {
+            if (pid === targetParentId) return; // Handle target separately
+            state.order[pid] = state.order[pid].filter(x => x !== id);
+        });
+
+        // Insert at correct index in TARGET order
+        const cleanOrder = newOrder.filter(x => x !== id);
+        const safeIndex = index !== undefined ? index : cleanOrder.length;
+        cleanOrder.splice(safeIndex, 0, id);
+        state.order[targetParentId] = cleanOrder;
+
+        await saveVirtualState(state);
+        return true;
+
+    } catch (e: any) {
+        console.error("Move failed", e);
+        return e.message;
     }
 };
 
-// Recursive Flag Setting
-export const setFolderFlag = async (folderNode: chrome.bookmarks.BookmarkTreeNode, flag: OpenFlag, recursive = true) => {
-    // 1. Collect all bookmark IDs (not folders, unless we want to flag folders? No, flags are for items)
-    // Actually our getBookmarkFlag checks based on ID.
-    // So we need to find all child items.
+// 2. Soft Delete (Hide)
+export const deleteBookmark = async (id: string) => {
+    // OLD: chrome.bookmarks.remove(id)
+    // NEW: Add to hidden list
+    const state = await loadVirtualState();
+    if (!state.hidden.includes(id)) {
+        state.hidden.push(id);
+        await saveVirtualState(state);
+    }
+};
 
+// 3. Restore
+export const restoreBookmark = async (id: string) => {
+    const state = await loadVirtualState();
+    state.hidden = state.hidden.filter(hId => hId !== id);
+    await saveVirtualState(state);
+};
+
+// 4. Virtual Rename
+export const renameBookmark = async (id: string, newTitle: string) => {
+    // OLD: chrome.bookmarks.update(id, { title })
+    // NEW: Update titles map
+    const state = await loadVirtualState();
+    state.titles[id] = newTitle;
+    await saveVirtualState(state);
+};
+
+// 5. Create Folder (Pass-through to Native + Auto-Append to Order?)
+export const createBookmarkFolder = async (parentId: string, index?: number, title: string = 'New Folder') => {
+    // Native create
+    const node = await chrome.bookmarks.create({ parentId, title, index }); // Index might be respected by Chrome, but Virtual Order overrides.
+    // Ideally we should add it to Virtual Order at the correct spot too?
+    // If we rely on "Re-fetch merges new items at end", it might jump.
+    // Better: Update Virtual Order immediately.
+
+    if (node) {
+        const state = await loadVirtualState();
+        let order = state.order[parentId];
+        if (order) {
+            // Insert ID at index
+            const safeIndex = index !== undefined ? index : order.length;
+            order.splice(safeIndex, 0, node.id);
+            await saveVirtualState(state);
+        }
+    }
+};
+
+
+// --- Recursive Helpers (Read behavior unchanged) ---
+export const setFolderFlag = async (folderNode: chrome.bookmarks.BookmarkTreeNode, flag: OpenFlag, recursive = true) => {
     const ids: string[] = [];
     const traverse = (node: chrome.bookmarks.BookmarkTreeNode) => {
-        if (node.url) {
-            ids.push(node.id);
-        }
+        if (node.url) ids.push(node.id);
         if (node.children) {
-            if (recursive) {
-                node.children.forEach(traverse);
-            } else {
-                node.children.forEach(child => {
-                    if (child.url) ids.push(child.id);
-                });
-            }
+            if (recursive) node.children.forEach(traverse);
+            else node.children.forEach(c => { if (c.url) ids.push(c.id); });
         }
     };
-
-    // If folderNode itself is the root to start from
-    if (folderNode.children) {
-        folderNode.children.forEach(traverse);
-    }
-
+    if (folderNode.children) folderNode.children.forEach(traverse);
     if (ids.length === 0) return;
-
-    // 2. batch update
     const updateMap: FlagMap = {};
-    ids.forEach(id => {
-        updateMap[id] = flag;
-    });
-
+    ids.forEach(id => { updateMap[id] = flag; });
     await setBookmarkFlags(updateMap);
 };
 
-// Main Action: Open based on settings/flags
 export const openBookmark = async (bookmark: chrome.bookmarks.BookmarkTreeNode, isBackgroundClick = false) => {
     if (!bookmark.url) return;
-
-    // 1. Forced Background Open (Context Menu)
     if (isBackgroundClick) {
-        // Explicitly active: false prevents focus stealing
         await chrome.tabs.create({ url: bookmark.url, active: false });
         return;
     }
-
-    // 2. Open based on Flags
     const localFlag = await getBookmarkFlag(bookmark.id);
     const globalFlag = await getGlobalDefaultFlag();
     const flag = localFlag || globalFlag; // Local overrides Global
@@ -132,47 +195,20 @@ export const openBookmark = async (bookmark: chrome.bookmarks.BookmarkTreeNode, 
             await chrome.tabs.create({ url: bookmark.url, active: true });
         }
     } else {
-        // Default Fallback (should be covered by globalFlag='NB' but just in case)
         await chrome.tabs.create({ url: bookmark.url, active: false });
     }
 };
 
-// Helper to recursively collect URLs
-const collectUrls = (node: chrome.bookmarks.BookmarkTreeNode, recursive: boolean, acc: string[] = []) => {
-    if (node.url) {
-        acc.push(node.url);
-    }
-    if (node.children) {
-        if (recursive) {
-            node.children.forEach(child => collectUrls(child, recursive, acc));
-        } else {
-            // If not recursive, we only want direct children files, but my helper structure is node-based.
-            // If the entry function was called on the Folder, we iterate its children.
-            // But if called recursively, we stop.
-            // Actually, simplest is: Top level logic handles direct interaction.
-            // But for recursion, we need to dive.
-        }
-    }
-    return acc;
-};
-
-// Refined collector for the entry point
 const getUrlsFromFolder = (folderNode: chrome.bookmarks.BookmarkTreeNode, recursive: boolean): string[] => {
     const urls: string[] = [];
     if (!folderNode.children) return urls;
-
     if (recursive) {
-        // Deep traversal
         const traverse = (node: chrome.bookmarks.BookmarkTreeNode) => {
             if (node.url) urls.push(node.url);
-            if (node.children) {
-                node.children.forEach(traverse);
-            }
+            if (node.children) node.children.forEach(traverse);
         };
-        // Initial children
         folderNode.children.forEach(traverse);
     } else {
-        // Direct children only
         folderNode.children.forEach(child => {
             if (child.url) urls.push(child.url);
         });
@@ -182,79 +218,31 @@ const getUrlsFromFolder = (folderNode: chrome.bookmarks.BookmarkTreeNode, recurs
 
 export const openFolderInBackground = async (folderNode: chrome.bookmarks.BookmarkTreeNode, recursive = false) => {
     const urls = getUrlsFromFolder(folderNode, recursive);
-
     if (urls.length === 0) return;
-
     if (urls.length > 20) {
-        const confirmed = window.confirm(`You are about to open ${urls.length} tabs. This might slow down your browser. Continue?`);
+        const confirmed = window.confirm(`You are about to open ${urls.length} tabs. Continue?`);
         if (!confirmed) return;
     }
-
-    // Open all collected URLs in background tabs
     for (const url of urls) {
-        // eslint-disable-next-line
         await chrome.tabs.create({ url, active: false });
-    }
-    // Note: We intentionally await sequentially to avoid overloading browser process too fast, though parallel is also possible.
-};
-
-export const moveBookmark = async (id: string, parentId: string, index?: number): Promise<boolean | string> => {
-    try {
-        await chrome.bookmarks.move(id, { parentId, index });
-        return true;
-    } catch (error: any) {
-        console.error('Failed to move bookmark:', error);
-        return error.message || JSON.stringify(error);
-    }
-};
-export const createBookmarkFolder = async (parentId: string, index?: number, title: string = 'New Folder'): Promise<void> => {
-    try {
-        await chrome.bookmarks.create({
-            parentId,
-            index,
-            title
-        });
-    } catch (error) {
-        console.error('Failed to create folder:', error);
     }
 };
 
 export const saveSession = async () => {
     try {
-        // 1. Get all tabs in current window
         const tabs = await chrome.tabs.query({ currentWindow: true });
         if (tabs.length === 0) return;
-
-        // 2. Create "Session YYYY-MM-DD HH:mm" Folder
         const now = new Date();
         const folderName = `Session ${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-
-        // Create in "Other Bookmarks" (usually root '2' is Other, but let's just use '2' or find it)
-        // Ideally we search for "Other Bookmarks" or just dump in root (which might be '0' or '1' or '2')
-        // '1' is usually Bookmark Bar, '2' is Other Bookmarks. Let's try '2'.
-        // Safe fallback: '1' if '2' fails? No, let's just use '2' for Other Bookmarks or '1' for Bar if user prefers.
-        // Let's us '2' (Other Bookmarks) as default for session dumps to avoid cluttering bar.
-        const parentId = '2';
-
-        const folder = await chrome.bookmarks.create({
-            parentId,
-            title: folderName
-        });
-
+        const parentId = '2'; // Other Bookmarks
+        const folder = await chrome.bookmarks.create({ parentId, title: folderName });
         if (!folder) return;
-
-        // 3. Save all tabs
         for (const tab of tabs) {
             if (tab.url && tab.title) {
-                await chrome.bookmarks.create({
-                    parentId: folder.id,
-                    title: tab.title,
-                    url: tab.url
-                });
+                await chrome.bookmarks.create({ parentId: folder.id, title: tab.title, url: tab.url });
             }
         }
         return true;
-
     } catch (error) {
         console.error('Failed to save session:', error);
         return false;

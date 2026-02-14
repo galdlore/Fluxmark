@@ -1,69 +1,110 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
     type VirtualNode,
     initializeVirtualTree,
-    saveVirtualTree,
-    loadVirtualTree,
-    removeNodeFromTree
+    loadExpandedState,
+    saveExpandedState
 } from '../utils/virtualTreeUtils';
 
 export const useBookmarks = () => {
     const [bookmarks, setBookmarks] = useState<VirtualNode[]>([]);
     const [loading, setLoading] = useState(true);
+    const [showHidden, setShowHidden] = useState(false); // New State: Toggle Hidden Items
+    const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
-    // Initial Load
-    const fetchBookmarks = async (silent = false) => {
+    // Main Refresh Logic
+    const fetchBookmarks = useCallback(async (silent = false) => {
         if (!silent) setLoading(true);
-        const tree = await initializeVirtualTree();
-        setBookmarks(tree);
-        if (!silent) setLoading(false);
-    };
 
-    // Force Save (used by DragEnd and Rename)
-    const updateBookmarks = async (newTree: VirtualNode[]) => {
-        setBookmarks(newTree);
-        await saveVirtualTree(newTree);
-    };
+        try {
+            // 1. Load State & Tree
+            // initializeVirtualTree wraps loadVirtualState + chrome.bookmarks.getTree + buildVirtualTree
+            const tree = await initializeVirtualTree(showHidden);
+
+            // 2. Load Expanded State (Runtime UI state)
+            const expanded = await loadExpandedState();
+            setExpandedIds(expanded);
+
+            setBookmarks(tree);
+        } catch (error) {
+            console.error("Failed to fetch bookmarks:", error);
+        } finally {
+            if (!silent) setLoading(false);
+        }
+    }, [showHidden]);
+
+    // Force Re-render with current state (useful after actions)
+    const refresh = useCallback(async () => {
+        await fetchBookmarks(true);
+    }, [fetchBookmarks]);
+
+    // Toggle Hidden Items
+    const toggleShowHidden = useCallback(() => {
+        setShowHidden(prev => !prev);
+    }, []);
+
+    // Toggle Expanded Helper (Wraps state update)
+    const toggleNode = useCallback(async (id: string, isExpanded: boolean) => {
+        const newSet = new Set(expandedIds);
+        if (isExpanded) {
+            newSet.add(id);
+        } else {
+            newSet.delete(id);
+        }
+        setExpandedIds(newSet);
+        await saveExpandedState(newSet);
+    }, [expandedIds]);
+
 
     useEffect(() => {
         fetchBookmarks();
 
         // Listeners for Chrome events (Sync Existence)
-        // 1. Created: Add to virtual tree (simple append)
-        const onCreated = async (_id: string, _bookmark: chrome.bookmarks.BookmarkTreeNode) => {
-            // Re-fetch to ensure correct order (index) from native tree
+        // 1. Created: Refresh tree (new item will appear at end/default pos)
+        const onCreated = async () => { /*_id, _bookmark*/
             await fetchBookmarks(true);
         };
 
-        // 2. Removed: Remove from virtual tree
-        const onRemoved = async (id: string) => {
-            const currentTree = await loadVirtualTree() || [];
-            const newTree = removeNodeFromTree(currentTree, id);
-            setBookmarks(newTree);
-            await saveVirtualTree(newTree);
+        // 2. Removed: Refresh tree (item will disappear if not virtually hidden logic? 
+        // Wait, if removed from Chrome, it's gone.
+        // Virtual Hidden is only for when "We delete it virtually". 
+        // If user deletes in Chrome, it should be gone here too.
+        // buildVirtualTree iterates NATIVE nodes. If native node is gone, it's gone. Correct.
+        const onRemoved = async () => { /*id*/
+            await fetchBookmarks(true);
         };
 
         const onMoved = async () => {
-            // Simplified: Just re-fetch full tree to ensure consistency
-            // Silent refresh to keep scroll position!
+            // Native Move -> Refresh. 
+            // If we have virtual parent override, it might look weird if native parent changes?
+            // But buildVirtualTree respects virtualParent if present.
             await fetchBookmarks(true);
         };
 
-        // 3. Changed: Only update URL if changed? Ignore Title (user custom).
-        // actually we can ignore it completely if we are fully decoupled.
-        // user asks for "book mark name can be custom in extension".
+        const onChanged = async () => {
+            await fetchBookmarks(true);
+        }
 
         chrome.bookmarks.onCreated.addListener(onCreated);
         chrome.bookmarks.onRemoved.addListener(onRemoved);
         chrome.bookmarks.onMoved.addListener(onMoved);
+        chrome.bookmarks.onChanged.addListener(onChanged);
 
         return () => {
             chrome.bookmarks.onCreated.removeListener(onCreated);
             chrome.bookmarks.onRemoved.removeListener(onRemoved);
             chrome.bookmarks.onMoved.removeListener(onMoved);
+            chrome.bookmarks.onChanged.removeListener(onChanged);
         };
-    }, []);
+    }, [fetchBookmarks]);
 
-    // Default refresh to silent=true because usually manual refresh is for updates, initial load is internal
-    return { bookmarks, loading, updateBookmarks, refresh: () => fetchBookmarks(true) };
+    return {
+        bookmarks,
+        loading,
+        refresh,
+        showHidden,
+        toggleShowHidden,
+        expandedIds,
+        toggleNode
+    };
 };

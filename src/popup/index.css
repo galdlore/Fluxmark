@@ -16,6 +16,12 @@
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --bg-primary: #0f172a;
@@ -34,11 +40,26 @@
 
 body {
   margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  /* Restore: Prevent body scroll, let React container handle it */
   font-family: var(--font-sans);
   background-color: var(--bg-primary);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
+}
+
+html {
+  height: 100%;
+}
+
+#root {
+  height: 100%;
+  width: 100%;
 }
 
 /* Utilities */
@@ -101,6 +122,57 @@ body {
   height: 100%;
 }
 
+.h-screen {
+  height: 100vh;
+}
+
+.w-screen {
+  width: 100vw;
+}
+
+.flex-1 {
+  flex: 1 1 0%;
+}
+
+.flex-none {
+  flex: none;
+}
+
+.overflow-hidden {
+  overflow: hidden;
+}
+
+.overflow-y-auto {
+  overflow-y: auto;
+}
+
+.min-h-0 {
+  min-height: 0;
+}
+
+/* Color Utilities */
+.bg-primary {
+  background-color: var(--bg-primary);
+}
+
+.text-primary {
+  color: var(--text-primary);
+}
+
+.border-color {
+  border-color: var(--border-color);
+}
+
+.border-b {
+  border-bottom-width: 1px;
+  border-style: solid;
+}
+
+.border {
+  border-width: 1px;
+  border-style: solid;
+}
+
 .text-sm {
   font-size: 0.875rem;
   line-height: 1.25rem;
@@ -133,6 +205,36 @@ body {
 
 .select-none {
   user-select: none;
+}
+
+.border-none {
+  border: none;
+}
+
+.outline-none {
+  outline: none;
+}
+
+/* State Utilities */
+.bg-accent {
+  background-color: var(--accent-color);
+}
+
+.text-white {
+  color: #ffffff;
+}
+
+.text-gray-400 {
+  color: #9ca3af;
+}
+
+.hover-bg-gray-200:hover {
+  background-color: var(--bg-hover);
+  /* Use var for theme support */
+}
+
+.hover-opacity-90:hover {
+  opacity: 0.9;
 }
 
 .truncate {
