@@ -3,7 +3,8 @@ import {
     type VirtualNode,
     initializeVirtualTree,
     loadExpandedState,
-    saveExpandedState
+    saveExpandedState,
+    STORAGE_KEY_EXPANDED
 } from '../utils/virtualTreeUtils';
 
 export const useBookmarks = () => {
@@ -45,15 +46,17 @@ export const useBookmarks = () => {
 
     // Toggle Expanded Helper (Wraps state update)
     const toggleNode = useCallback(async (id: string, isExpanded: boolean) => {
-        const newSet = new Set(expandedIds);
-        if (isExpanded) {
-            newSet.add(id);
-        } else {
-            newSet.delete(id);
-        }
-        setExpandedIds(newSet);
-        await saveExpandedState(newSet);
-    }, [expandedIds]);
+        setExpandedIds(prev => {
+            const newSet = new Set(prev);
+            if (isExpanded) {
+                newSet.add(id);
+            } else {
+                newSet.delete(id);
+            }
+            saveExpandedState(newSet).catch(console.error);
+            return newSet;
+        });
+    }, []);
 
 
     useEffect(() => {
@@ -85,16 +88,25 @@ export const useBookmarks = () => {
             await fetchBookmarks(true);
         }
 
+        const onStorageChanged = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
+            if (areaName === 'local' && changes[STORAGE_KEY_EXPANDED]) {
+                const newIds = changes[STORAGE_KEY_EXPANDED].newValue as string[];
+                setExpandedIds(new Set(newIds || []));
+            }
+        };
+
         chrome.bookmarks.onCreated.addListener(onCreated);
         chrome.bookmarks.onRemoved.addListener(onRemoved);
         chrome.bookmarks.onMoved.addListener(onMoved);
         chrome.bookmarks.onChanged.addListener(onChanged);
+        chrome.storage.onChanged.addListener(onStorageChanged);
 
         return () => {
             chrome.bookmarks.onCreated.removeListener(onCreated);
             chrome.bookmarks.onRemoved.removeListener(onRemoved);
             chrome.bookmarks.onMoved.removeListener(onMoved);
             chrome.bookmarks.onChanged.removeListener(onChanged);
+            chrome.storage.onChanged.removeListener(onStorageChanged);
         };
     }, [fetchBookmarks]);
 

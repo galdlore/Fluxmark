@@ -17,7 +17,7 @@ export interface VirtualState {
 }
 
 const STORAGE_KEY_STATE = 'virtual_bookmark_state';
-const STORAGE_KEY_EXPANDED = 'expanded_nodes';
+export const STORAGE_KEY_EXPANDED = 'expanded_nodes';
 
 // Initial Load of Stats
 export const loadVirtualState = async (): Promise<VirtualState> => {
@@ -166,8 +166,9 @@ export const buildVirtualTree = (
 
     // 4. Build Roots
     // We expect nativeNodes to be the top-level list (e.g., Bookmarks Bar, Other Bookmarks)
-    // We map them directly.
-    return nativeNodes.map(root => buildNode(root));
+    return nativeNodes
+        .filter(root => showHidden || !state.hidden.includes(root.id))
+        .map(root => buildNode(root));
 };
 
 // --- Helpers for Action Integration ---

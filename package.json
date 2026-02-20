@@ -1,11 +1,11 @@
 {
   "name": "my-extension",
   "private": false,
-  "version": "1.1.0",
+  "version": "1.2",
   "description": "Efficient bookmark manager for Chrome Side Panel",
   "repository": {
     "type": "git",
-    "url": "https://github.com/YourUsername/FluxMarks.git"
+    "url": "https://github.com/galdlore/FluxMarks.git"
   },
   "type": "module",
   "scripts": {
