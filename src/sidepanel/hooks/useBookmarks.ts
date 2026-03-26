@@ -4,7 +4,8 @@ import {
     initializeVirtualTree,
     loadExpandedState,
     saveExpandedState,
-    STORAGE_KEY_EXPANDED
+    STORAGE_KEY_EXPANDED,
+    isVirtualStateKey
 } from '../utils/virtualTreeUtils';
 
 export const useBookmarks = () => {
@@ -92,6 +93,10 @@ export const useBookmarks = () => {
             if (areaName === 'local' && changes[STORAGE_KEY_EXPANDED]) {
                 const newIds = changes[STORAGE_KEY_EXPANDED].newValue as string[];
                 setExpandedIds(new Set(newIds || []));
+            }
+            // 別デバイスからsyncで届いた virtual state の変更を反映
+            if (areaName === 'sync' && Object.keys(changes).some(isVirtualStateKey)) {
+                fetchBookmarks(true).catch(console.error);
             }
         };
 

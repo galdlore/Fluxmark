@@ -13,45 +13,76 @@ interface FlagMap {
     [id: string]: OpenFlag | undefined;
 }
 
-// Re-implement Flag getters/setters
+// ローカルストレージからsyncへの一回限りの移行
+let _flagsMigrated = false;
+const ensureFlagsMigrated = async () => {
+    if (_flagsMigrated) return;
+    _flagsMigrated = true;
+    const syncResult = await chrome.storage.sync.get([STORAGE_KEY, GLOBAL_STORAGE_KEY]);
+    const toSet: { [key: string]: unknown } = {};
+    const toRemove: string[] = [];
+    if (!syncResult[STORAGE_KEY]) {
+        const local = await chrome.storage.local.get(STORAGE_KEY);
+        if (local[STORAGE_KEY]) {
+            toSet[STORAGE_KEY] = local[STORAGE_KEY];
+            toRemove.push(STORAGE_KEY);
+        }
+    }
+    if (!syncResult[GLOBAL_STORAGE_KEY]) {
+        const local = await chrome.storage.local.get(GLOBAL_STORAGE_KEY);
+        if (local[GLOBAL_STORAGE_KEY]) {
+            toSet[GLOBAL_STORAGE_KEY] = local[GLOBAL_STORAGE_KEY];
+            toRemove.push(GLOBAL_STORAGE_KEY);
+        }
+    }
+    if (Object.keys(toSet).length > 0) await chrome.storage.sync.set(toSet);
+    if (toRemove.length > 0) await chrome.storage.local.remove(toRemove);
+};
+
+// Flag getters/setters (sync)
 export const setBookmarkFlag = async (id: string, flag: OpenFlag) => {
-    const result = await chrome.storage.local.get(STORAGE_KEY);
+    await ensureFlagsMigrated();
+    const result = await chrome.storage.sync.get(STORAGE_KEY);
     const flags = (result[STORAGE_KEY] || {}) as FlagMap;
     if (flag === null) {
         delete flags[id];
     } else {
         flags[id] = flag;
     }
-    await chrome.storage.local.set({ [STORAGE_KEY]: flags });
+    await chrome.storage.sync.set({ [STORAGE_KEY]: flags });
 };
 
 export const getBookmarkFlag = async (id: string): Promise<OpenFlag> => {
-    const result = await chrome.storage.local.get(STORAGE_KEY);
+    await ensureFlagsMigrated();
+    const result = await chrome.storage.sync.get(STORAGE_KEY);
     const flags = (result[STORAGE_KEY] || {}) as FlagMap;
     return flags[id] || null;
 };
 
 export const setGlobalDefaultFlag = async (flag: OpenFlag) => {
+    await ensureFlagsMigrated();
     if (flag === null) {
-        await chrome.storage.local.remove(GLOBAL_STORAGE_KEY);
+        await chrome.storage.sync.remove(GLOBAL_STORAGE_KEY);
     } else {
-        await chrome.storage.local.set({ [GLOBAL_STORAGE_KEY]: flag });
+        await chrome.storage.sync.set({ [GLOBAL_STORAGE_KEY]: flag });
     }
 };
 
 export const getGlobalDefaultFlag = async (): Promise<OpenFlag> => {
-    const result = await chrome.storage.local.get(GLOBAL_STORAGE_KEY);
+    await ensureFlagsMigrated();
+    const result = await chrome.storage.sync.get(GLOBAL_STORAGE_KEY);
     return (result[GLOBAL_STORAGE_KEY] as OpenFlag) || 'NB';
 };
 
 export const setBookmarkFlags = async (flagMap: FlagMap) => {
-    const result = await chrome.storage.local.get(STORAGE_KEY);
+    await ensureFlagsMigrated();
+    const result = await chrome.storage.sync.get(STORAGE_KEY);
     const existingFlags = (result[STORAGE_KEY] || {}) as FlagMap;
     const newFlags = { ...existingFlags, ...flagMap };
     Object.keys(flagMap).forEach(key => {
         if (flagMap[key] === null) delete newFlags[key];
     });
-    await chrome.storage.local.set({ [STORAGE_KEY]: newFlags });
+    await chrome.storage.sync.set({ [STORAGE_KEY]: newFlags });
 };
 
 // --- Virtual Actions ---
