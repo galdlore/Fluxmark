@@ -16,6 +16,19 @@ export interface VirtualState {
     virtualParent: { [childId: string]: string }; // Virtual parent mapping for folder moves
 }
 
+// --- Stable Key (device-independent identifier) ---
+
+/**
+ * デバイス間で一致するキーを生成する。
+ * URLブックマーク: url + dateAdded の複合
+ * フォルダ: dateAdded (またはタイトルフォールバック)
+ * → Chrome sync はこれらの値を保持するため、IDと異なりデバイス間で一致する。
+ */
+export const stableKey = (node: { url?: string; dateAdded?: number; title?: string }): string => {
+    if (node.url) return `u_${node.url}_${node.dateAdded ?? 0}`;
+    return `f_${node.dateAdded ?? node.title ?? 'root'}`;
+};
+
 // --- Storage Keys ---
 // sync: virtual state (split per key to avoid 8KB/item limit)
 const STORAGE_KEY_ORDER_PREFIX = 'vs_order_'; // + parentId per folder
@@ -173,7 +186,8 @@ export const buildVirtualTree = (
     // 3. Recursive Build Function
     const buildNode = (nativeNode: chrome.bookmarks.BookmarkTreeNode): VirtualNode => {
         const id = nativeNode.id;
-        const isHidden = state.hidden.includes(id);
+        const key = stableKey(nativeNode);
+        const isHidden = state.hidden.includes(key);
 
         let childIds = childrenMap.get(id) || [];
 
@@ -198,7 +212,7 @@ export const buildVirtualTree = (
             }
         });
 
-        const title = state.titles[id] !== undefined ? state.titles[id] : nativeNode.title;
+        const title = state.titles[key] !== undefined ? state.titles[key] : nativeNode.title;
 
         return {
             id,

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run:*)",
+      "Bash(powershell -Command \"Compress-Archive -Path dist\\\\* -DestinationPath fluxmarks-v1.4.zip -Force\")"
+    ]
+  }
+}

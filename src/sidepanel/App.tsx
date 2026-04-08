@@ -130,21 +130,20 @@ const App = () => {
 
     const handleRename = async (newName: string) => {
         if (isSafetyMode || !contextMenu?.node) return;
-        await renameBookmark(contextMenu.node.id, newName);
+        await renameBookmark(contextMenu.node, newName);
         refresh();
     };
 
     const handleDelete = async () => {
         if (contextMenu?.node) {
-            await deleteBookmark(contextMenu.node.id);
-            // utilize hook listener/refresh
+            await deleteBookmark(contextMenu.node);
             refresh();
         }
     };
 
     const handleRestore = async () => {
         if (contextMenu?.node) {
-            await restoreBookmark(contextMenu.node.id);
+            await restoreBookmark(contextMenu.node);
             refresh();
         }
     };
@@ -266,13 +265,13 @@ const App = () => {
                         {/* Reset State Button */}
                         <button
                             onClick={async () => {
-                                if (window.confirm("Are you sure you want to reset all customizations? This will clear custom names, hidden items, and virtual folder structures.")) {
+                                if (window.confirm("カスタム設定（名前変更・非表示・並び順）をすべてリセットします。\n別デバイスとの同期がおかしい場合もここでリセットしてください。")) {
                                     await resetVirtualState();
                                     window.location.reload();
                                 }
                             }}
                             className="p-1 rounded hover:bg-red-100 text-xs border border-color opacity-70 text-red-500"
-                            title="Reset Customizations"
+                            title="設定リセット / 再同期"
                         >
                             🗑️
                         </button>

@@ -1,6 +1,7 @@
 import {
     loadVirtualState,
-    saveVirtualState
+    saveVirtualState,
+    stableKey
 } from './virtualTreeUtils';
 
 // --- Flags ---
@@ -140,29 +141,27 @@ export const moveBookmark = async (id: string, targetParentId: string, index?: n
 };
 
 // 2. Soft Delete (Hide)
-export const deleteBookmark = async (id: string) => {
-    // OLD: chrome.bookmarks.remove(id)
-    // NEW: Add to hidden list
+export const deleteBookmark = async (node: { url?: string; dateAdded?: number; title?: string }) => {
     const state = await loadVirtualState();
-    if (!state.hidden.includes(id)) {
-        state.hidden.push(id);
+    const key = stableKey(node);
+    if (!state.hidden.includes(key)) {
+        state.hidden.push(key);
         await saveVirtualState(state);
     }
 };
 
 // 3. Restore
-export const restoreBookmark = async (id: string) => {
+export const restoreBookmark = async (node: { url?: string; dateAdded?: number; title?: string }) => {
     const state = await loadVirtualState();
-    state.hidden = state.hidden.filter(hId => hId !== id);
+    const key = stableKey(node);
+    state.hidden = state.hidden.filter(k => k !== key);
     await saveVirtualState(state);
 };
 
 // 4. Virtual Rename
-export const renameBookmark = async (id: string, newTitle: string) => {
-    // OLD: chrome.bookmarks.update(id, { title })
-    // NEW: Update titles map
+export const renameBookmark = async (node: { url?: string; dateAdded?: number; title?: string }, newTitle: string) => {
     const state = await loadVirtualState();
-    state.titles[id] = newTitle;
+    state.titles[stableKey(node)] = newTitle;
     await saveVirtualState(state);
 };
 
