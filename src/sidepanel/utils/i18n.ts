@@ -1,0 +1,132 @@
+export type Language = 'en' | 'ja';
+
+export const translations = {
+    en: {
+        app: {
+            hideDeletedItems: "Hide Deleted Items",
+            showDeletedItems: "Show Deleted Items",
+            globalDefaultAction: "Global Default Action",
+            newTabBack: "New Tab (Back)",
+            newTabFront: "New Tab (Front)",
+            currentTab: "Current Tab",
+            saveSession: "Save Current Session (Tabs to Folder)",
+            safetyModeOn: "Safety Mode ON (Read Only)",
+            editModeOn: "Edit Mode ON",
+            resetPrompt: "This will reset all custom settings (renames, hides, sorting).\nPlease also use this if synchronization with other devices is behaving strangely.",
+            resetButtonTitle: "Reset Settings / Resync",
+            helpUsage: "Help & Usage",
+            settings: "Settings",
+            searchPlaceholder: "Search bookmarks...",
+            loading: "Loading...",
+            foundResults: "Found {0} result(s)",
+            noResults: "No results found.",
+        },
+        help: {
+            title: "Valid Usage & Features",
+            close: "✕ Close",
+            safetyModeTitle: "Safety Mode",
+            safetyModeDesc: "Toggle between Read-Only (Safety) and Edit Mode. In Safety Mode, Drag & Drop and Renaming are disabled to verify accidental changes.",
+            saveSessionTitle: "Save Session",
+            saveSessionDesc: "Saves all tabs in the current window to a new folder named Session YYYY-MM-DD HH:mm. The folder is created under Other Bookmarks.",
+            interactionTitle: "Interaction",
+            interactionLeftClick: "Left Click: Open bookmark (default is New Tab Background).",
+            interactionRightClick: "Right Click: Open Context Menu (Rename, Delete, New Folder, Set Open Mode).",
+            interactionDragDrop: "Drag & Drop: Reorder bookmarks (Edit Mode only).",
+            searchTitle: "Search",
+            searchDesc: "Filter bookmarks by title or URL. Drag & Drop is disabled while searching.",
+        },
+        settings: {
+            title: "Settings",
+            language: "Language",
+            close: "✕ Close",
+        },
+        contextMenu: {
+            enterNewName: "Enter new name:",
+            newFolder: "📁 New Folder",
+            rename: "✏️ Rename",
+            openAllDirect: "📂 Open All (Direct)",
+            openAllRecursive: "📂 Open All (Recursive)",
+            setChildrenOpenMode: "Set Children Open Mode",
+            setModeNewTabBack: "Set Mode: New Tab (Back)",
+            setModeNewTabFront: "Set Mode: New Tab (Front)",
+            setModeCurrentTab: "Set Mode: Current Tab",
+            resetAllClear: "Reset All (Clear)",
+            openInBackground: "Open in Background",
+            defaultAction: "Default Action",
+            newForegroundTab: "New Foreground Tab (NF)",
+            reloadCurrentTab: "Reload Current Tab (RF)",
+            newBackgroundTab: "New Background Tab (NB)",
+            defaultBackground: "Default (Background)",
+            restore: "👁️ Restore",
+            hide: "👁️ Hide",
+        }
+    },
+    ja: {
+        app: {
+            hideDeletedItems: "削除されたアイテムを非表示",
+            showDeletedItems: "削除されたアイテムを表示",
+            globalDefaultAction: "グローバルなデフォルト動作",
+            newTabBack: "新しいタブ (バックグラウンド)",
+            newTabFront: "新しいタブ (フォアグラウンド)",
+            currentTab: "現在のタブ",
+            saveSession: "現在のセッションを保存 (タブをフォルダへ)",
+            safetyModeOn: "セーフティモードオン (読み取り専用)",
+            editModeOn: "編集モードオン",
+            resetPrompt: "カスタム設定（名前変更・非表示・並び順）をすべてリセットします。\n別デバイスとの同期がおかしい場合もここでリセットしてください。",
+            resetButtonTitle: "設定リセット / 再同期",
+            helpUsage: "ヘルプと使い方",
+            settings: "設定",
+            searchPlaceholder: "ブックマークを検索...",
+            loading: "読み込み中...",
+            foundResults: "{0} 件の結果が見つかりました",
+            noResults: "結果が見つかりません。",
+        },
+        help: {
+            title: "使い方と機能",
+            close: "✕ 閉じる",
+            safetyModeTitle: "セーフティモード",
+            safetyModeDesc: "読み取り専用（セーフティモード）と編集モードを切り替えます。セーフティモードでは、誤操作を防ぐためにドラッグ＆ドロップと名前変更が無効になります。",
+            saveSessionTitle: "セッションを保存",
+            saveSessionDesc: "現在のウィンドウ内のすべてのタブを Session YYYY-MM-DD HH:mm という名前の新しいフォルダに保存します。フォルダはその他のブックマークの下に作成されます。",
+            interactionTitle: "操作",
+            interactionLeftClick: "左クリック: ブックマークを開く（デフォルトはバックグラウンドの新しいタブ）。",
+            interactionRightClick: "右クリック: コンテキストメニューを開く（名前変更、削除、新しいフォルダ、開き方の設定）。",
+            interactionDragDrop: "ドラッグ＆ドロップ: ブックマークを並べ替える（編集モードのみ）。",
+            searchTitle: "検索",
+            searchDesc: "タイトルやURLでブックマークをフィルタリングします。検索中はドラッグ＆ドロップが無効になります。",
+        },
+        settings: {
+            title: "設定",
+            language: "言語 (Language)",
+            close: "✕ 閉じる",
+        },
+        contextMenu: {
+            enterNewName: "新しい名前を入力:",
+            newFolder: "📁 新しいフォルダ",
+            rename: "✏️ 名前を変更",
+            openAllDirect: "📂 すべて開く (直接)",
+            openAllRecursive: "📂 すべて開く (再帰的)",
+            setChildrenOpenMode: "子要素の開き方を設定",
+            setModeNewTabBack: "モード設定: 新しいタブ (バックグラウンド)",
+            setModeNewTabFront: "モード設定: 新しいタブ (フォアグラウンド)",
+            setModeCurrentTab: "モード設定: 現在のタブ",
+            resetAllClear: "すべてリセット (クリア)",
+            openInBackground: "バックグラウンドで開く",
+            defaultAction: "デフォルトの動作",
+            newForegroundTab: "新しいフォアグラウンドタブ (NF)",
+            reloadCurrentTab: "現在のタブで開く (RF)",
+            newBackgroundTab: "新しいバックグラウンドタブ (NB)",
+            defaultBackground: "デフォルト (バックグラウンド)",
+            restore: "👁️ 復元",
+            hide: "👁️ 非表示",
+        }
+    }
+};
+
+export function t(lang: Language, section: keyof typeof translations['en'], key: string, ...args: string[]): string {
+    const text = (translations[lang] as any)[section]?.[key] || (translations['en'] as any)[section]?.[key] || key;
+    if (!args || args.length === 0) return text;
+    return text.replace(/{(\d+)}/g, (match: string, number: string) => {
+        return typeof args[number as any] !== 'undefined' ? args[number as any] : match;
+    });
+}
