@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import type { OpenFlag } from '../utils/bookmarkActions';
+import { type Language, t } from '../utils/i18n';
 
 interface ContextMenuProps {
     x: number;
@@ -17,10 +18,11 @@ interface ContextMenuProps {
     currentTitle: string;
     isSafetyMode?: boolean;
     isHidden?: boolean;
+    lang: Language;
 }
 
 const ContextMenu: React.FC<ContextMenuProps> = ({
-    x, y, isFolder, onClose, onOpenBackground, onSetFlag, onRename, onDelete, onRestore, onNewFolder, currentFlag, currentTitle, isSafetyMode, isHidden
+    x, y, isFolder, onClose, onOpenBackground, onSetFlag, onRename, onDelete, onRestore, onNewFolder, currentFlag, currentTitle, isSafetyMode, isHidden, lang
 }) => {
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -35,7 +37,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
     }, [onClose]);
 
     const handleRenameClick = () => {
-        const name = prompt("Enter new name:", currentTitle);
+        const name = prompt(t(lang, 'contextMenu', 'enterNewName'), currentTitle);
         if (name) {
             onRename(name);
             onClose();
@@ -83,10 +85,10 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
             {!isSafetyMode && (
                 <>
                     <button className="menu-item" onClick={() => { onNewFolder(); onClose(); }}>
-                        📁 New Folder
+                        {t(lang, 'contextMenu', 'newFolder')}
                     </button>
                     <button className="menu-item" onClick={handleRenameClick}>
-                        ✏️ Rename
+                        {t(lang, 'contextMenu', 'rename')}
                     </button>
                 </>
             )}
@@ -94,48 +96,48 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
             {isFolder ? (
                 <>
                     <button className="menu-item" onClick={() => { onOpenBackground(false); onClose(); }}>
-                        📂 Open All (Direct)
+                        {t(lang, 'contextMenu', 'openAllDirect')}
                     </button>
                     <button className="menu-item" onClick={() => { onOpenBackground(true); onClose(); }}>
-                        📂 Open All (Recursive)
+                        {t(lang, 'contextMenu', 'openAllRecursive')}
                     </button>
                     <div className="h-[1px] bg-[var(--border-color)] my-1 w-full opacity-50"></div>
-                    <div className="px-2 py-1 text-xs text-gray-500 font-bold uppercase tracking-wider">Set Children Open Mode</div>
+                    <div className="px-2 py-1 text-xs text-gray-500 font-bold uppercase tracking-wider">{t(lang, 'contextMenu', 'setChildrenOpenMode')}</div>
                     <button className="menu-item" onClick={() => { onSetFlag('NB'); onClose(); }}>
-                        Set Mode: New Tab (Back)
+                        {t(lang, 'contextMenu', 'setModeNewTabBack')}
                     </button>
                     <button className="menu-item" onClick={() => { onSetFlag('NF'); onClose(); }}>
-                        Set Mode: New Tab (Front)
+                        {t(lang, 'contextMenu', 'setModeNewTabFront')}
                     </button>
                     <button className="menu-item" onClick={() => { onSetFlag('RF'); onClose(); }}>
-                        Set Mode: Current Tab
+                        {t(lang, 'contextMenu', 'setModeCurrentTab')}
                     </button>
                     <button className="menu-item" onClick={() => { onSetFlag(null); onClose(); }}>
-                        Reset All (Clear)
+                        {t(lang, 'contextMenu', 'resetAllClear')}
                     </button>
                 </>
             ) : (
                 <>
                     <button className="menu-item" onClick={() => { onOpenBackground(false); onClose(); }}>
-                        Open in Background
+                        {t(lang, 'contextMenu', 'openInBackground')}
                     </button>
                     <div className="h-[1px] bg-[var(--border-color)] my-1 w-full opacity-50"></div>
 
-                    <div className="px-2 py-1 text-xs text-gray-500 font-bold uppercase tracking-wider">Default Action</div>
+                    <div className="px-2 py-1 text-xs text-gray-500 font-bold uppercase tracking-wider">{t(lang, 'contextMenu', 'defaultAction')}</div>
                     <button className="menu-item justify-between" onClick={() => { onSetFlag('NF'); onClose(); }}>
-                        <span>New Foreground Tab (NF)</span>
+                        <span>{t(lang, 'contextMenu', 'newForegroundTab')}</span>
                         {currentFlag === 'NF' && <span>✓</span>}
                     </button>
                     <button className="menu-item justify-between" onClick={() => { onSetFlag('RF'); onClose(); }}>
-                        <span>Reload Current Tab (RF)</span>
+                        <span>{t(lang, 'contextMenu', 'reloadCurrentTab')}</span>
                         {currentFlag === 'RF' && <span>✓</span>}
                     </button>
                     <button className="menu-item justify-between" onClick={() => { onSetFlag('NB'); onClose(); }}>
-                        <span>New Background Tab (NB)</span>
+                        <span>{t(lang, 'contextMenu', 'newBackgroundTab')}</span>
                         {currentFlag === 'NB' && <span>✓</span>}
                     </button>
                     <button className="menu-item justify-between" onClick={() => { onSetFlag(null); onClose(); }}>
-                        <span>Default (Background)</span>
+                        <span>{t(lang, 'contextMenu', 'defaultBackground')}</span>
                         {currentFlag === null && <span>✓</span>}
                     </button>
                 </>
@@ -149,14 +151,14 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
                             onRestore();
                             onClose();
                         }}>
-                            👁️ Restore
+                            {t(lang, 'contextMenu', 'restore')}
                         </button>
                     ) : (
                         <button className="menu-item text-red-500 hover:bg-red-900/20" onClick={() => {
                             onDelete();
                             onClose();
                         }}>
-                            👁️ Hide
+                            {t(lang, 'contextMenu', 'hide')}
                         </button>
                     )}
                 </>

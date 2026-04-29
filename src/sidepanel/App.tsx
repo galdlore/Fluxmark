@@ -40,6 +40,8 @@ import {
 } from './utils/virtualTreeUtils';
 import { searchBookmarks } from './utils/searchUtils';
 import HelpView from './components/HelpView';
+import SettingsView from './components/SettingsView';
+import { t, type Language } from './utils/i18n';
 
 const App = () => {
     const { bookmarks, loading, refresh, showHidden, toggleShowHidden, expandedIds, toggleNode } = useBookmarks();
@@ -49,10 +51,19 @@ const App = () => {
         return localStorage.getItem('safetyMode') === 'true';
     });
     const [isHelpOpen, setIsHelpOpen] = useState(false);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [language, setLanguage] = useState<Language>(() => {
+        const stored = localStorage.getItem('language');
+        return stored === 'en' || stored === 'ja' ? stored : 'ja';
+    });
 
     useEffect(() => {
         localStorage.setItem('safetyMode', String(isSafetyMode));
     }, [isSafetyMode]);
+
+    useEffect(() => {
+        localStorage.setItem('language', language);
+    }, [language]);
 
     // Global Default State
     const [globalDefault, setGlobalDefaultState] = useState<OpenFlag>('NB');
@@ -169,7 +180,7 @@ const App = () => {
         const parentId = ctx.parentId;
         if (!parentId || parentId === '0') return;
 
-        await createBookmarkFolder(parentId, ctx.index + 1, 'New Folder');
+        await createBookmarkFolder(parentId, ctx.index + 1, t(language, 'app', 'newFolderName'));
         refresh();
     };
 
@@ -222,7 +233,7 @@ const App = () => {
                         <button
                             onClick={toggleShowHidden}
                             className={`p-1 rounded transition-colors border-none outline-none ring-0 focus:ring-0 ${showHidden ? 'bg-accent text-white hover-opacity-90' : 'text-gray-400 hover-bg-gray-200'}`}
-                            title={showHidden ? "Hide Deleted Items" : "Show Deleted Items"}
+                            title={showHidden ? t(language, 'app', 'hideDeletedItems') : t(language, 'app', 'showDeletedItems')}
                         >
                             👁️
                         </button>
@@ -232,11 +243,11 @@ const App = () => {
                             value={globalDefault || 'NB'}
                             onChange={handleGlobalDefaultChange}
                             className="text-xs bg-[var(--bg-secondary)] text-primary border border-color rounded p-1 outline-none"
-                            title="Global Default Action"
+                            title={t(language, 'app', 'globalDefaultAction')}
                         >
-                            <option value="NB">New Tab (Back)</option>
-                            <option value="NF">New Tab (Front)</option>
-                            <option value="RF">Current Tab</option>
+                            <option value="NB">{t(language, 'app', 'newTabBack')}</option>
+                            <option value="NF">{t(language, 'app', 'newTabFront')}</option>
+                            <option value="RF">{t(language, 'app', 'currentTab')}</option>
                         </select>
 
                         {/* Save Session Button */}
@@ -247,7 +258,7 @@ const App = () => {
                                 if (success) refresh();
                             }}
                             className="p-1 rounded hover:bg-[var(--bg-hover)] text-xs border border-color opacity-70"
-                            title="Save Current Session (Tabs to Folder)"
+                            title={t(language, 'app', 'saveSession')}
                             disabled={isSafetyMode}
                         >
                             💾
@@ -257,7 +268,7 @@ const App = () => {
                         <button
                             onClick={() => setIsSafetyMode(!isSafetyMode)}
                             className="p-1 rounded hover:bg-[var(--bg-hover)] text-xs font-mono border border-color opacity-70"
-                            title={isSafetyMode ? "Safety Mode ON (Read Only)" : "Edit Mode ON"}
+                            title={isSafetyMode ? t(language, 'app', 'safetyModeOn') : t(language, 'app', 'editModeOn')}
                         >
                             {isSafetyMode ? "🔒" : "🔓"}
                         </button>
@@ -265,22 +276,37 @@ const App = () => {
                         {/* Reset State Button */}
                         <button
                             onClick={async () => {
-                                if (window.confirm("カスタム設定（名前変更・非表示・並び順）をすべてリセットします。\n別デバイスとの同期がおかしい場合もここでリセットしてください。")) {
+                                if (window.confirm(t(language, 'app', 'resetPrompt'))) {
                                     await resetVirtualState();
                                     window.location.reload();
                                 }
                             }}
                             className="p-1 rounded hover:bg-red-100 text-xs border border-color opacity-70 text-red-500"
-                            title="設定リセット / 再同期"
+                            title={t(language, 'app', 'resetButtonTitle')}
                         >
                             🗑️
                         </button>
 
+                        {/* Settings Button */}
+                        <button
+                            onClick={() => {
+                                setIsHelpOpen(false);
+                                setIsSettingsOpen(true);
+                            }}
+                            className="p-1 rounded hover:bg-[var(--bg-hover)] text-xs border border-color opacity-70 font-bold w-6 h-6 flex items-center justify-center"
+                            title={t(language, 'app', 'settings')}
+                        >
+                            ⚙️
+                        </button>
+
                         {/* Help Button */}
                         <button
-                            onClick={() => setIsHelpOpen(true)}
+                            onClick={() => {
+                                setIsSettingsOpen(false);
+                                setIsHelpOpen(true);
+                            }}
                             className="p-1 rounded hover:bg-[var(--bg-hover)] text-xs border border-color opacity-70 font-bold w-6 h-6 flex items-center justify-center"
-                            title="Help & Usage"
+                            title={t(language, 'app', 'helpUsage')}
                         >
                             ?
                         </button>
@@ -290,7 +316,7 @@ const App = () => {
                 {/* Search Input */}
                 <input
                     type="text"
-                    placeholder="Search bookmarks..."
+                    placeholder={t(language, 'app', 'searchPlaceholder')}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full text-xs bg-[var(--bg-secondary)] text-primary border border-color rounded p-1.5 outline-none focus:border-[var(--accent-color)]"
@@ -299,10 +325,16 @@ const App = () => {
 
             <div className="flex-1 overflow-y-auto min-h-0 p-2 pt-0">
                 {loading ? (
-                    <p className="text-sm text-[var(--text-secondary)] text-center py-4">Loading...</p>
+                    <p className="text-sm text-[var(--text-secondary)] text-center py-4">{t(language, 'app', 'loading')}</p>
                 ) : isHelpOpen ? (
                     // Help View
-                    <HelpView onClose={() => setIsHelpOpen(false)} />
+                    <HelpView lang={language} onClose={() => setIsHelpOpen(false)} />
+                ) : isSettingsOpen ? (
+                    <SettingsView
+                        lang={language}
+                        onChangeLanguage={setLanguage}
+                        onClose={() => setIsSettingsOpen(false)}
+                    />
                 ) : (
                     <DndContext
                         sensors={sensors}
@@ -316,7 +348,7 @@ const App = () => {
                                 searchResults.length > 0 ? (
                                     <div className="space-y-1">
                                         <p className="text-xs text-[var(--text-secondary)] px-2 pb-2">
-                                            Found {searchResults.length} result(s)
+                                            {t(language, 'app', 'foundResults', String(searchResults.length))}
                                         </p>
                                         <SortableContext
                                             items={searchResults.map(b => b.id)}
@@ -337,7 +369,7 @@ const App = () => {
                                         </SortableContext>
                                     </div>
                                 ) : (
-                                    <p className="text-sm text-[var(--text-secondary)] text-center py-4">No results found.</p>
+                                    <p className="text-sm text-[var(--text-secondary)] text-center py-4">{t(language, 'app', 'noResults')}</p>
                                 )
                             ) : (
                                 // Standard Tree View
@@ -404,6 +436,7 @@ const App = () => {
                         currentTitle={contextMenu.node.title}
                         isSafetyMode={isSafetyMode}
                         isHidden={!!contextMenu.node.isHidden}
+                        lang={language}
                     />
                 )
             }
