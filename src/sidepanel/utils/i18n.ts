@@ -20,6 +20,7 @@ export const translations = {
             loading: "Loading...",
             foundResults: "Found {0} result(s)",
             noResults: "No results found.",
+            newFolderName: "New Folder",
         },
         help: {
             title: "Valid Usage & Features",
@@ -39,6 +40,8 @@ export const translations = {
             title: "Settings",
             language: "Language",
             close: "✕ Close",
+            japanese: "Japanese",
+            english: "English",
         },
         contextMenu: {
             enterNewName: "Enter new name:",
@@ -80,6 +83,7 @@ export const translations = {
             loading: "読み込み中...",
             foundResults: "{0} 件の結果が見つかりました",
             noResults: "結果が見つかりません。",
+            newFolderName: "新しいフォルダ",
         },
         help: {
             title: "使い方と機能",
@@ -99,6 +103,8 @@ export const translations = {
             title: "設定",
             language: "言語 (Language)",
             close: "✕ 閉じる",
+            japanese: "日本語",
+            english: "英語",
         },
         contextMenu: {
             enterNewName: "新しい名前を入力:",

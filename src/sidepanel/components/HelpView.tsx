@@ -1,51 +1,51 @@
 import React from 'react';
+import { type Language, t } from '../utils/i18n';
 
 interface HelpViewProps {
     onClose: () => void;
+    lang: Language;
 }
 
-const HelpView: React.FC<HelpViewProps> = ({ onClose }) => {
+const HelpView: React.FC<HelpViewProps> = ({ onClose, lang }) => {
     return (
         <div className="bg-[var(--bg-primary)] border-b border-[var(--border-color)] p-4 h-full overflow-y-auto">
             <div className="flex justify-between items-center pb-3 border-b border-[var(--border-color)] mb-3">
-                <h2 className="font-bold text-sm">Valid Usage & Features</h2>
-                <button onClick={onClose} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-bold">✕ Close</button>
+                <h2 className="font-bold text-sm">{t(lang, 'help', 'title')}</h2>
+                <button onClick={onClose} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-bold">{t(lang, 'help', 'close')}</button>
             </div>
 
             <div className="space-y-4 text-xs text-[var(--text-secondary)]">
                 <section>
                     <h3 className="font-bold text-[var(--text-primary)] mb-1 flex items-center gap-2">
-                        <span>🔒 / 🔓</span> Safety Mode
+                        <span>🔒 / 🔓</span> {t(lang, 'help', 'safetyModeTitle')}
                     </h3>
                     <p>
-                        Toggle between <strong>Read-Only</strong> (Safety) and <strong>Edit Mode</strong>.
-                        In Safety Mode, Drag & Drop and Renaming are disabled to verify accidental changes.
+                        {t(lang, 'help', 'safetyModeDesc')}
                     </p>
                 </section>
 
                 <section>
                     <h3 className="font-bold text-[var(--text-primary)] mb-1 flex items-center gap-2">
-                        <span>💾</span> Save Session
+                        <span>💾</span> {t(lang, 'help', 'saveSessionTitle')}
                     </h3>
                     <p>
-                        Saves all tabs in the current window to a new folder named <strong>Session YYYY-MM-DD HH:mm</strong>.
-                        The folder is created under <strong>Other Bookmarks</strong>.
+                        {t(lang, 'help', 'saveSessionDesc')}
                     </p>
                 </section>
 
                 <section>
-                    <h3 className="font-bold text-[var(--text-primary)] mb-1">🖱️ Interaction</h3>
+                    <h3 className="font-bold text-[var(--text-primary)] mb-1">🖱️ {t(lang, 'help', 'interactionTitle')}</h3>
                     <ul className="list-disc pl-4 space-y-1">
-                        <li><strong>Left Click</strong>: Open bookmark (default is New Tab Background).</li>
-                        <li><strong>Right Click</strong>: Open Context Menu (Rename, Delete, New Folder, Set Open Mode).</li>
-                        <li><strong>Drag & Drop</strong>: Reorder bookmarks (Edit Mode only).</li>
+                        <li>{t(lang, 'help', 'interactionLeftClick')}</li>
+                        <li>{t(lang, 'help', 'interactionRightClick')}</li>
+                        <li>{t(lang, 'help', 'interactionDragDrop')}</li>
                     </ul>
                 </section>
 
                 <section>
-                    <h3 className="font-bold text-[var(--text-primary)] mb-1">🔍 Search</h3>
+                    <h3 className="font-bold text-[var(--text-primary)] mb-1">🔍 {t(lang, 'help', 'searchTitle')}</h3>
                     <p>
-                        Filter bookmarks by title or URL. Drag & Drop is disabled while searching.
+                        {t(lang, 'help', 'searchDesc')}
                     </p>
                 </section>
 
